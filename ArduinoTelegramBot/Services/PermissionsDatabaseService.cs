@@ -9,7 +9,7 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
 {
     private static readonly Dictionary<string, List<string>> _permissions = new()
     {
-        {"adminKey", new List<string> {"/admin", "/user", "/get_serial", "/start_serial", "/serial", "/temp"}},
+        {"adminKey", new List<string> {"/admin", "/user", "/get_serial", "/start_serial", "/serial", "/temp", "/close_serial", "/open_serial"}},
         {"userKey", new List<string> {"/user"}}
     };
     public async Task<List<string>> GetPermissionsAsync(string key)

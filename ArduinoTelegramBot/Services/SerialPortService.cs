@@ -72,13 +72,13 @@ namespace ArduinoTelegramBot.Services
             if (!_serialPort.IsOpen)
             {
                 _serialPort.Open();
-                Log.Information("Сервис последовательного порта: SerialPort открыт.");
-                return ActionStatusResult.Ok("SerialPort открыт.");
+                Log.Information("Сервис последовательного порта: SerialPort {sp} открыт.", _serialPort.PortName);
+                return ActionStatusResult.Ok($"Порт {_serialPort.PortName} открыт.");
             }
             else
             {
-                Log.Warning("Сервис последовательного порта: SerialPort уже открыт.");
-                return ActionStatusResult.Error("SerialPort уже открыт.");
+                Log.Warning("Сервис последовательного порта: SerialPort {sp} уже открыт.", _serialPort.PortName);
+                return ActionStatusResult.Error($"Порт {_serialPort.PortName} уже открыт.");
             }
         }
 
@@ -90,17 +90,17 @@ namespace ArduinoTelegramBot.Services
                 {
                     _serialPort.Open();
                     Log.Information($"Сервис последовательного порта: SerialPort успешно открыт: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
-                    return ActionStatusResult.Ok($"SerialPort успешно открыт с параметрами: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
+                    return ActionStatusResult.Ok($"Порт успешно открыт с параметрами: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
                 }
                 else
                 {
-                    return ActionStatusResult.Error("SerialPort уже открыт.");
+                    return ActionStatusResult.Error($"Порт {_serialPort.PortName} уже открыт.");
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Сервис последовательного порта: Ошибка при открытии SerialPort");
-                return ActionStatusResult.Error($"Ошибка при открытии SerialPort: {ex.Message}");
+                Log.Error(ex, "Сервис последовательного порта: Ошибка при открытии SerialPort: {ex}", ex.Message);
+                return ActionStatusResult.Error($"Ошибка при открытии порта: {ex.Message}");
             }
         }
 
@@ -112,12 +112,13 @@ namespace ArduinoTelegramBot.Services
             if (_serialPort.IsOpen)
             {
                 _serialPort.Close();
-                Log.Information("Сервис последовательного порта: SerialPort закрыт.");
-                return ActionStatusResult.Ok("SerialPort закрыт.");
+                Log.Information("Сервис последовательного порта: SerialPort {sp} закрыт", _serialPort.PortName);
+                return ActionStatusResult.Ok($"Порт {_serialPort.PortName} успешно закрыт.");
             }
             else
             {
-                return ActionStatusResult.Error("Сервис последовательного порта: SerialPort уже закрыт или не был открыт.");
+                Log.Information("Сервис последовательного порта: SerialPort {sp} уже закрыт или не был открыт.", _serialPort.PortName);
+                return ActionStatusResult.Error($"Порт {_serialPort.PortName} уже закрыт или не был открыт.");
             }
         }
 
@@ -127,13 +128,13 @@ namespace ArduinoTelegramBot.Services
             if (_serialPort.IsOpen)
             {
                 _serialPort.Write(data);
-                Log.Information("Сервис последовательного порта: Данные отправлены в SerialPort {data}", data);
+                Log.Information("Сервис последовательного порта: Данные отправлены в SerialPort {sp}: {data}", _serialPort.PortName, data);
                 return ActionStatusResult.Ok("Данные отправлены.");
             }
             else
             {
                 Log.Warning("Сервис последовательного порта: Попытка отправить данные в SerialPort завершилась неудачей - порт не открыт.");
-                return ActionStatusResult.Error("SerialPort не открыт.");
+                return ActionStatusResult.Error($"Порт не открыт.");
             }
         }
     }

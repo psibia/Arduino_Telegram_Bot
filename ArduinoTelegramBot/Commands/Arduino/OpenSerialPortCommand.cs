@@ -11,7 +11,7 @@ using Telegram.Bot.Types;
 
 namespace ArduinoTelegramBot.Commands.Arduino
 {
-    public class CloseSerialPortCommand : IAuthorizedCommand
+    public class OpenSerialPortCommand : IAuthorizedCommand
     {
         private readonly ITelegramBotClient _botClient;
         private readonly ISerialPortService _serialPortService;
@@ -19,19 +19,17 @@ namespace ArduinoTelegramBot.Commands.Arduino
 
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
         {
-            var result = await _serialPortService.ClosePortAsync();
+            var result = await _serialPortService.TryOpenPortAsync();
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
-
-        public CloseSerialPortCommand(ITelegramBotClient botClient, ISerialPortService serialPortService)
+        public OpenSerialPortCommand(ITelegramBotClient botClient, ISerialPortService serialPortService)
         {
             _botClient = botClient;
             _serialPortService = serialPortService;
         }
-
-        public static CloseSerialPortCommand Create(IServiceProvider serviceProvider, string name) 
+        public static OpenSerialPortCommand Create(IServiceProvider serviceProvider, string name)
         {
-            return new CloseSerialPortCommand(
+            return new OpenSerialPortCommand(
                 serviceProvider.GetRequiredService<ITelegramBotClient>(),
                 serviceProvider.GetRequiredService<ISerialPortService>())
             {

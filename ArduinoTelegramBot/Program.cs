@@ -65,6 +65,8 @@ class Program
         services.AddTransient<IAuthorizedCommand>(serviceProvider => StartSerialPortCommand.Create(serviceProvider, "/start_serial"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => SendDataCommand.Create(serviceProvider, "/serial"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => GetTemperatureDataCommand.Create(serviceProvider, "/temp"));
+        services.AddTransient<IAuthorizedCommand>(serviceProvider => CloseSerialPortCommand.Create(serviceProvider, "/close_serial"));
+        services.AddTransient<IAuthorizedCommand>(serviceProvider => OpenSerialPortCommand.Create(serviceProvider, "/open_serial"));
         #endregion
         #region обработчики полученных данных с ардуинки
         services.AddTransient<ISerialDataProcessor, TemperatureDataProcessor>();
