@@ -1,4 +1,5 @@
-﻿using ArduinoTelegramBot.Services.Interfaces;
+﻿using ArduinoTelegramBot.Models;
+using ArduinoTelegramBot.Services.Interfaces;
 using Newtonsoft.Json;
 using Serilog;
 using System.IO.Ports;
@@ -7,23 +8,27 @@ namespace ArduinoTelegramBot.Services;
 
 public class PermissionsDatabaseService : IPermissionsDatabaseService
 {
-    private static readonly Dictionary<string, List<string>> _permissions = new()
+    private static readonly List<AccessKey> _accessKeys = new()
     {
-        {"adminKey", new List<string> {"/admin", "/user", "/get_serial", "/start_serial", "/serial", "/temp", "/close_serial", "/open_serial"}},
-        {"userKey", new List<string> {"/user"}}
+        new AccessKey("adminKey", new List<string> {"/user"}, isActive: true, isMasterKey: true),
+        new AccessKey("commandKey", new List<string> {"/admin", "/user", "/get_serial", "/start_serial", "/serial", "/temp", "/close_serial", "/open_serial"}, isActive: true, isMasterKey: false),
+        new AccessKey("userKey", new List<string> {"/user"}, isActive: true, isMasterKey: false)
     };
+
     public async Task<List<string>> GetPermissionsAsync(string key)
     {
         await Task.Delay(42);
-        if (_permissions.TryGetValue(key, out var permissions))
+        var accessKey = _accessKeys.FirstOrDefault(k => k.Key == key && k.IsActive);
+
+        if (accessKey != null)
         {
             Log.Information("База данных: Разрешения для ключа '{Key}' успешно получены", key);
-            return permissions;
+            return accessKey.IsMasterKey ? null : accessKey.AvailableCommands;
         }
         else
         {
-            Log.Warning("База данных: Ключ '{Key}' не найден", key);
-            throw new KeyNotFoundException($"Ключ '{key}' не найден в базе данных.");
+            Log.Warning("База данных: Ключ '{Key}' не найден или не активен", key);
+            throw new KeyNotFoundException($"Ключ '{key}' не найден в базе данных или не активен.");
         }
     }
 

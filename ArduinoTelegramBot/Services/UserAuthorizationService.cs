@@ -36,31 +36,27 @@ public class UserAuthorizationService : IUserAuthorizationService
     {
         if (_userKeys.TryGetValue(userId, out var key))
         {
-            //Проверяем, не истекло ли время кэширования прав пользователя
             if (!_lastChecked.ContainsKey(userId) || DateTime.UtcNow.Subtract(_lastChecked[userId]).TotalMinutes > CacheDurationInMinutes || !_permissions.ContainsKey(key))
             {
                 try
                 {
                     var permissions = await _permissionsDatabase.GetPermissionsAsync(key);
-                    _lastChecked[userId] = DateTime.UtcNow; //обновляем время последней успешной проверки
-                    _permissions[key] = permissions; //обновляем кэшированные разрешения
+                    _lastChecked[userId] = DateTime.UtcNow; // Обновляем время последней успешной проверки.
+                    _permissions[key] = permissions ?? new List<string>(); // Обновляем кэшированные разрешения для мастер-ключа.
 
-                    return permissions.Contains(commandName, StringComparer.InvariantCultureIgnoreCase);
+                    return permissions == null || permissions.Contains(commandName, StringComparer.InvariantCultureIgnoreCase);
                 }
                 catch (KeyNotFoundException)
                 {
-                    //если ключ не найден, считаем, что пользователь не авторизован для выполнения команды
                     return false;
                 }
             }
             else
             {
-                //используем кэшированные разрешения для проверки доступа к команде
-                return _permissions[key].Contains(commandName, StringComparer.InvariantCultureIgnoreCase);
+                return _permissions[key] == null || _permissions[key].Contains(commandName, StringComparer.InvariantCultureIgnoreCase);
             }
         }
 
-        //если ключ не найден в userKeys, пользователь не авторизован
         return false;
     }
 
