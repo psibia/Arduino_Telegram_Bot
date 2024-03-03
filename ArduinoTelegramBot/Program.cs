@@ -45,7 +45,7 @@ class Program
     {
         Log.Debug("Program: Настройка сервисов");
 
-        services.AddSingleton<ITelegramBotClient>(provider => new TelegramBotClient("7049729360:AAHhLFRmpq5Q9UKdbrhnQSIV9UXeDFnGgtA"));
+        services.AddSingleton<ITelegramBotClient>(provider => new TelegramBotClient("7115970409:AAG9nm3Rh5w-4mFVSKiTynyFOmjfCKNBj_o"));
         services.AddSingleton<IUserAuthorizationService, UserAuthorizationService>();
         services.AddSingleton<ISerialPortService, SerialPortService>();
         services.AddSingleton<ISerialDataHandler, SerialDataHandler>();
