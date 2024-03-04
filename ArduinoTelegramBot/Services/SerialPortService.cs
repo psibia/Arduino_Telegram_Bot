@@ -67,21 +67,6 @@ namespace ArduinoTelegramBot.Services
             }
         }
 
-        public async Task<ActionStatusResult> OpenPortAsync()
-        {
-            if (!_serialPort.IsOpen)
-            {
-                _serialPort.Open();
-                Log.Information("Сервис последовательного порта: SerialPort {sp} открыт.", _serialPort.PortName);
-                return ActionStatusResult.Ok($"Порт {_serialPort.PortName} открыт.");
-            }
-            else
-            {
-                Log.Warning("Сервис последовательного порта: SerialPort {sp} уже открыт.", _serialPort.PortName);
-                return ActionStatusResult.Error($"Порт {_serialPort.PortName} уже открыт.");
-            }
-        }
-
         public async Task<ActionStatusResult> TryOpenPortAsync()
         {
             try
