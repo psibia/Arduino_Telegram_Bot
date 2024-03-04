@@ -11,7 +11,6 @@ namespace ArduinoTelegramBot.Services
         private SerialPort _serialPort = new SerialPort();
         private Action<string, long> _onDataReceived;
         private ISerialDataHandler _dataHandler;
-        public string CurrentPortName() => _serialPort.IsOpen ? _serialPort.PortName : null;
 
 
         public void Initialize(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits)
