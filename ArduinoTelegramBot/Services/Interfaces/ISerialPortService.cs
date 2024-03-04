@@ -9,6 +9,7 @@ namespace ArduinoTelegramBot.Services.Interfaces
         Task<ActionStatusResult> ListAvailablePortsAsync();
         Task<ActionStatusResult> ClosePortAsync();
         Task<ActionStatusResult> SendDataAsync(string data);
+        Task<ActionStatusResult> SendBinaryDataAsync(byte[] data);
         void ActivateDataReceiving(Action<string, long> onDataReceived);
         Task<ActionStatusResult> TryOpenPortAsync();
         SerialPort CurrentSerialPort();

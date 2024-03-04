@@ -121,5 +121,30 @@ namespace ArduinoTelegramBot.Services
                 return ActionStatusResult.Error($"Порт не открыт.");
             }
         }
+
+        public async Task<ActionStatusResult> SendBinaryDataAsync(byte[] data)
+        {
+            try
+            {
+                if (!_serialPort.IsOpen)
+                {
+                    return ActionStatusResult.Error("Порт не открыт. Отправка данных невозможна.");
+                }
+
+                _serialPort.Write(data, 0, data.Length);
+                Log.Information("Сервис последовательного порта: Бинарные данные успешно отправлены: {data}", BitConverter.ToString(data));
+                return ActionStatusResult.Ok($"Бинарные данные успешно отправлены: {BitConverter.ToString(data)}.");
+            }
+            catch (TimeoutException ex)
+            {
+                Log.Error(ex, "Сервис последовательного порта: Превышено время ожидания для отправки данных в {pn}", _serialPort.PortName);
+                return ActionStatusResult.Error("Превышено время ожидания для отправки данных.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Сервис последовательного порта: Произошла ошибка при отправке данных в {pn}: {msg}", _serialPort.PortName, ex.Message);
+                return ActionStatusResult.Error($"Произошла ошибка при отправке данных: {ex.Message}.");
+            }
+        }
     }
 }
