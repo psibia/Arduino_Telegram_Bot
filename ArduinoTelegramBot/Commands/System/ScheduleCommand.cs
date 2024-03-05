@@ -51,6 +51,9 @@ namespace ArduinoTelegramBot.Commands.System
                 case ScheduleCommandActions.Help:
                     await SendHelpMessageAsync(botClient, message.Chat.Id);
                     break;
+                case ScheduleCommandActions.Get:
+                    await HandleGetScheduledTasksAsync(botClient, message.Chat.Id);
+                    break;
                 default:
                     await HandleActionAsync(botClient, message, action, parts.Skip(2).ToArray());
                     break;
@@ -195,6 +198,26 @@ namespace ArduinoTelegramBot.Commands.System
             var commandName = parameters[0];
             var result = _schedulerService.CancelAllScheduledTasks(commandName);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
+        }
+
+        private async Task HandleGetScheduledTasksAsync(ITelegramBotClient botClient, long chatId)
+        {
+            var scheduledTasks = _schedulerService.GetScheduledTasksForChat(chatId.ToString());
+
+            if (scheduledTasks.Count == 0)
+            {
+                await botClient.SendTextMessageAsync(chatId, "Нет запланированных задач.");
+                return;
+            }
+
+            var messageBuilder = new StringBuilder("Запланированные задачи:\n");
+            foreach (var task in scheduledTasks)
+            {
+                string taskType = task.CommandType == "Ежедневная" ? "Время" : "Интервал";
+                messageBuilder.AppendLine($"- {task.CommandType}: {task.CommandName}, {taskType}: {task.ExecutionTimeOrInterval}");
+            }
+
+            await botClient.SendTextMessageAsync(chatId, messageBuilder.ToString());
         }
 
         private bool TryParseTimeWithStrictFormat(string timeString, out TimeSpan timeSpan)

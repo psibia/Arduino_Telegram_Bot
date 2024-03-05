@@ -27,8 +27,11 @@ namespace ArduinoTelegramBot.Services
                 return ScheduleOperationResult.Error($"Циклическое выполнение команды {command.Name} уже запланировано");
             }
 
-            var timer = new Timer(Callback, new SchedulerTimerInfo { Command = command, ChatId = chatId }, interval, interval);
-            _timers.Add(new SchedulerTimerInfo { Timer = timer, ChatId = chatId, Command = command });
+            var schedulerTimerInfo = new SchedulerTimerInfo { Command = command, ChatId = chatId, Interval = interval };
+            var timer = new Timer(Callback, schedulerTimerInfo, interval, interval);
+            schedulerTimerInfo.Timer = timer; // Убедитесь, что таймер также установлен в SchedulerTimerInfo
+
+            _timers.Add(schedulerTimerInfo); // Используйте полностью инициализированный экземпляр
             Log.Information("Планировщик задач: Команда {CommandName} запланирована для чата {ChatId} с интервалом {Interval}", command.Name, chatId, interval);
             return ScheduleOperationResult.Ok($"Запланировано циклическое выполнение команды {command.Name} с интервалом {interval}");
         }
@@ -42,7 +45,8 @@ namespace ArduinoTelegramBot.Services
             var now = DateTime.Now;
             var firstRunTime = now.TimeOfDay > dailyTime ? now.Date.AddDays(1).Add(dailyTime) : now.Date.Add(dailyTime);
             var initialDelay = firstRunTime - now;
-            var timer = new Timer(Callback, new SchedulerTimerInfo { Command = command, ChatId = chatId, DailyTime = dailyTime }, initialDelay, TimeSpan.FromDays(1));
+            //var timer = new Timer(Callback, new SchedulerTimerInfo { Command = command, ChatId = chatId, DailyTime = dailyTime }, initialDelay, TimeSpan.FromDays(1));
+            var timer = new Timer(Callback, new SchedulerTimerInfo { Command = command, ChatId = chatId, DailyTime = dailyTime, Interval = TimeSpan.FromDays(1) }, initialDelay, TimeSpan.FromDays(1));
             _timers.Add(new SchedulerTimerInfo { Timer = timer, ChatId = chatId, Command = command, DailyTime = dailyTime });
             Log.Information("Планировщик задач: Ежедневная задача {CommandName} запланирована для чата {ChatId} на {DailyTime}", command.Name, chatId, dailyTime);
             return ScheduleOperationResult.Ok($"Ежедневная задача {command.Name} успешно запланирована на {dailyTime}.");
@@ -106,6 +110,26 @@ namespace ArduinoTelegramBot.Services
 
             return ScheduleOperationResult.Ok($"Полная отмена задач для команды: {commandName}");
         }
+
+        public List<ScheduledTaskInfo> GetScheduledTasksForChat(string chatId)
+        {
+            var scheduledTasks = new List<ScheduledTaskInfo>();
+
+            foreach (var timerInfo in _timers.Where(t => t.ChatId == chatId))
+            {
+                var scheduledTaskInfo = new ScheduledTaskInfo
+                {
+                    CommandName = timerInfo.Command.Name,
+                    CommandType = timerInfo.DailyTime.HasValue ? "Ежедневная" : "Циклическая",
+                    ExecutionTimeOrInterval = timerInfo.DailyTime.HasValue ? timerInfo.DailyTime.Value.ToString(@"hh\:mm\:ss") : timerInfo.Interval.ToString(@"hh\:mm\:ss")
+                };
+
+                scheduledTasks.Add(scheduledTaskInfo);
+            }
+
+            return scheduledTasks;
+        }
+
 
         private void Callback(object state)
         {

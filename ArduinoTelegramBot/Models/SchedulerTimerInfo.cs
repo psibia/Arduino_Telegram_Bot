@@ -13,5 +13,6 @@ namespace ArduinoTelegramBot.Models
         public string ChatId { get; set; }
         public IAuthorizedCommand Command { get; set; }
         public TimeSpan? DailyTime { get; set; }
+        public TimeSpan Interval { get; set; }
     }
 }

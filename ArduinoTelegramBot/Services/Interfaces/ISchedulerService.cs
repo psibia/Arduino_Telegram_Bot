@@ -10,5 +10,6 @@ namespace ArduinoTelegramBot.Services.Interfaces
         ScheduleOperationResult CancelScheduledCommand(string commandName);
         ScheduleOperationResult CancelScheduledDailyTask(string commandName, TimeSpan taskTime);
         ScheduleOperationResult CancelAllScheduledTasks(string commandName);
+        List<ScheduledTaskInfo> GetScheduledTasksForChat(string chatId);
     }
 }

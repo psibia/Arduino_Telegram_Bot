@@ -14,5 +14,6 @@ namespace ArduinoTelegramBot.Models
         public const string DeleteDaily = "delete_daily";
         public const string Delete = "delete";
         public const string Help = "help";
+        public const string Get = "get";
     }
 }
