@@ -8,7 +8,7 @@ public class UserAuthorizationService : IUserAuthorizationService
 {
     private Dictionary<long, string> _userKeys = new Dictionary<long, string>();
     private readonly Dictionary<long, DateTime> _lastChecked = new Dictionary<long, DateTime>();
-    private static readonly Dictionary<string, List<string>> _permissions = new(); //словарь для кэширования разрешений пользователя
+    private static readonly Dictionary<string, AccessKey> _permissions = new(); // Словарь для кэширования объектов AccessKey
     private const int CacheDurationInMinutes = 1; //длительность кэширования проверки ключа, в минутх
     private readonly IPermissionsDatabaseService _permissionsDatabase;
 
@@ -34,30 +34,28 @@ public class UserAuthorizationService : IUserAuthorizationService
 
     public async Task<bool> IsAuthorized(long userId, string commandName)
     {
-        if (_userKeys.TryGetValue(userId, out var key))
+        if (_userKeys.TryGetValue(userId, out var key) &&
+            (!_lastChecked.ContainsKey(userId) || DateTime.UtcNow.Subtract(_lastChecked[userId]).TotalMinutes > CacheDurationInMinutes || !_permissions.ContainsKey(key)))
         {
-            if (!_lastChecked.ContainsKey(userId) || DateTime.UtcNow.Subtract(_lastChecked[userId]).TotalMinutes > CacheDurationInMinutes || !_permissions.ContainsKey(key))
+            try
             {
-                try
-                {
-                    var permissions = await _permissionsDatabase.GetPermissionsAsync(key);
-                    _lastChecked[userId] = DateTime.UtcNow; // Обновляем время последней успешной проверки.
-                    _permissions[key] = permissions ?? new List<string>(); // Обновляем кэшированные разрешения для мастер-ключа.
+                var accessKey = await _permissionsDatabase.GetPermissionsAsync(key);
+                _lastChecked[userId] = DateTime.UtcNow; // Обновляем время последней успешной проверки.
+                _permissions[key] = accessKey; // Обновляем кэшированный объект AccessKey для ключа.
 
-                    return permissions == null || permissions.Contains(commandName, StringComparer.InvariantCultureIgnoreCase);
-                }
-                catch (KeyNotFoundException)
-                {
-                    return false;
-                }
+                return accessKey.IsMasterKey || (accessKey.AvailableCommands?.Contains(commandName, StringComparer.InvariantCultureIgnoreCase) ?? false);
             }
-            else
+            catch (KeyNotFoundException)
             {
-                return _permissions[key] == null || _permissions[key].Contains(commandName, StringComparer.InvariantCultureIgnoreCase);
+                return false;
             }
         }
-
-        return false;
+        else
+        {
+            // Если ключ находится в кэше и не истекло время кэширования, проверяем доступность команды.
+            var cachedAccessKey = _permissions[key];
+            return cachedAccessKey.IsMasterKey || (cachedAccessKey.AvailableCommands?.Contains(commandName, StringComparer.InvariantCultureIgnoreCase) ?? false);
+        }
     }
 
 
@@ -66,17 +64,18 @@ public class UserAuthorizationService : IUserAuthorizationService
     {
         try
         {
-            var permissions = await _permissionsDatabase.GetPermissionsAsync(key);
-            _userKeys[userId] = key;
-            _lastChecked[userId] = DateTime.UtcNow;
-
-            _permissions[key] = permissions;
-            //сохраняем обновленные данные авторизации
-            await _permissionsDatabase.SaveUserKeysAsync(_userKeys);
+            var accessKey = await _permissionsDatabase.GetPermissionsAsync(key);
+            if (accessKey != null)
+            {
+                _userKeys[userId] = key;
+                _lastChecked[userId] = DateTime.UtcNow;
+                _permissions[key] = accessKey; // Обновляем кэшированный объект AccessKey.
+                await _permissionsDatabase.SaveUserKeysAsync(_userKeys); // Сохраняем обновленные данные авторизации.
+            }
         }
         catch (KeyNotFoundException)
         {
-            //логируем на уровне выше, просто пробрасываем исключение, иначе задублируется
+            // Логируем на уровне выше, просто пробрасываем исключение.
             throw;
         }
     }

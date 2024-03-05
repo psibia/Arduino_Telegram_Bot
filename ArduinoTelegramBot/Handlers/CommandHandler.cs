@@ -36,7 +36,7 @@ public class CommandHandler : ICommandHandler
                 var isAuthorized = await _authorizationService.IsAuthorized(message.Chat.Id, authorizedCommand.Name);
                 if (!isAuthorized)
                 {
-                    var responseMessage = "У вас недостаточно прав для выполнения этой команды.";
+                    var responseMessage = $"У вас недостаточно прав для выполнения команды {command.Name}.";
                     Log.Warning("Обработчик команд: Пользователь {id} пытался выполнить команду без достаточных прав: {name}", message.Chat.Id, authorizedCommand.Name);
                     await botClient.SendTextMessageAsync(message.Chat.Id, responseMessage);
                     return;

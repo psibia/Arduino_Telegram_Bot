@@ -6,7 +6,7 @@ namespace ArduinoTelegramBot.Commands.System;
 
 public class DefaultCommand : ICommand
 {
-    public string Name { get; set; } = "/упс";
+    public string Name { get; set; } = "/default";
 
     public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
     {

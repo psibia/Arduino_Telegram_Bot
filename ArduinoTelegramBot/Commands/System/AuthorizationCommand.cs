@@ -10,7 +10,7 @@ public class AuthorizationCommand : ICommand
 {
     private readonly IUserAuthorizationService authorizationService;
 
-    public string Name { get; set; } = "/упс";
+    public string Name { get; set; } = "/auth";
 
     public AuthorizationCommand(IUserAuthorizationService authorizationService)
     {
@@ -39,7 +39,7 @@ public class AuthorizationCommand : ICommand
         }
         else
         {
-            await botClient.SendTextMessageAsync(message.Chat.Id, "Пожалуйста, предоставьте ключ. Команда должна выглядеть следующим образом: /auth <key>");
+            await botClient.SendTextMessageAsync(message.Chat.Id, $"Пожалуйста, предоставьте ключ. Команда должна выглядеть следующим образом: {this.Name} [ключ]");
         }
     }
 }

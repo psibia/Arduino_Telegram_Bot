@@ -7,7 +7,7 @@ namespace ArduinoTelegramBot.Commands.System
 {
     public class HelpCommand : ICommand
     {
-        public string Name { get; set; } = "/упс";
+        public string Name { get; set; } = "/help";
         IServiceProvider _serviceProvider;
 
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)

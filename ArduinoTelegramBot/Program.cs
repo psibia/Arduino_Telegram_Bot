@@ -74,7 +74,7 @@ class Program
         services.AddTransient<ISerialDataProcessor, TemperatureDataProcessor>();
         services.AddTransient<ISerialDataProcessor, DefaultDataProcessor>(); //обязательно оставить в самом низу списка процессоров, так как регулярка этого процессора подходит под все полученные данные. Те процессоры, что расположены ниже этого работать не будут, так как выполнится этот
         #endregion
-        services.AddHostedService<BotService>();
+        services.AddHostedService<BotService>();//не пытайся сделать интерфейс, там гемор
         services.AddHostedService(provider => provider.GetRequiredService<ISchedulerService>() as SchedulerService);
 
         Log.Debug("Program: Сервисы настроены");
