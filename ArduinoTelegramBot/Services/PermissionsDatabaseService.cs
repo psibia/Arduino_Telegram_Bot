@@ -2,6 +2,7 @@
 using ArduinoTelegramBot.Services.Interfaces;
 using Newtonsoft.Json;
 using Serilog;
+using System.Collections.Concurrent;
 using System.IO.Ports;
 
 namespace ArduinoTelegramBot.Services;
@@ -36,12 +37,12 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
 
 
     private static readonly string _authDataFilePath = "authData.json";
-    public async Task<Dictionary<long, string>> LoadUserKeysAsync()
+    public async Task<ConcurrentDictionary<long, string>> LoadUserKeysAsync()
     {
         if (File.Exists(_authDataFilePath))
         {
             var json = await File.ReadAllTextAsync(_authDataFilePath);
-            var userKeys = JsonConvert.DeserializeObject<Dictionary<long, string>>(json) ?? new Dictionary<long, string>();
+            var userKeys = JsonConvert.DeserializeObject<ConcurrentDictionary<long, string>>(json) ?? new ConcurrentDictionary<long, string>();
 
             Log.Information("База данных: Ключи пользователя успешно загружены");
             Log.Debug("База данных: Загруженные ключи пользователей: {UserKeys}", json);
@@ -50,11 +51,11 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         else
         {
             Log.Warning("В БД не найдены авторизационные данные, начинаем с пустого набора ключей пользователей.");
-            return new Dictionary<long, string>();
+            return new ConcurrentDictionary<long, string>();
         }
     }
 
-    public async Task SaveUserKeysAsync(Dictionary<long, string> userKeys)
+    public async Task SaveUserKeysAsync(ConcurrentDictionary<long, string> userKeys)
     {
         var json = JsonConvert.SerializeObject(userKeys, Formatting.Indented);
         await File.WriteAllTextAsync(_authDataFilePath, json);

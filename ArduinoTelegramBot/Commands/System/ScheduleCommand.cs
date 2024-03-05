@@ -91,41 +91,31 @@ namespace ArduinoTelegramBot.Commands.System
                     case "interval":
                         if (parts.Length != 4) throw new ArgumentException("Неверное количество аргументов для интервала.");
                         if (!TimeSpan.TryParse(parts[3], out var interval)) throw new ArgumentException("Неверный формат интервала.");
-                        _schedulerService.ScheduleCommand(command, message.Chat.Id.ToString(), interval);
-                        await botClient.SendTextMessageAsync(message.Chat.Id, $"Команда {commandName} запланирована с интервалом {parts[3]}.");
+
+                        var intervalResult = _schedulerService.ScheduleCommand(command, message.Chat.Id.ToString(), interval);
+                        await botClient.SendTextMessageAsync(message.Chat.Id, intervalResult.Message);
                         break;
                     case "daily":
                         if (parts.Length != 4) throw new ArgumentException("Неверное количество аргументов для ежедневной задачи.");
                         if (!TimeSpan.TryParse(parts[3], out var dailyTime)) throw new ArgumentException("Неверный формат времени.");
-                        _schedulerService.ScheduleDailyTask(command, message.Chat.Id.ToString(), dailyTime);
-                        await botClient.SendTextMessageAsync(message.Chat.Id, $"Ежедневная команда {commandName} запланирована на {parts[3]}.");
+
+                        var dailyResult = _schedulerService.ScheduleDailyTask(command, message.Chat.Id.ToString(), dailyTime);
+                        await botClient.SendTextMessageAsync(message.Chat.Id, dailyResult.Message);
                         break;
                     case "delete_interval":
-                        _schedulerService.CancelScheduledCommand(commandName);
-                        await botClient.SendTextMessageAsync(message.Chat.Id, $"Циклическая задача {commandName} отменена.");
+                        var deleteIntervalResult = _schedulerService.CancelScheduledCommand(commandName);
+                        await botClient.SendTextMessageAsync(message.Chat.Id, deleteIntervalResult.Message);
                         break;
                     case "delete_daily":
                         if (parts.Length != 4) throw new ArgumentException("Неверное количество аргументов для отмены ежедневной задачи.");
                         if (!TimeSpan.TryParse(parts[3], out var timeToDelete)) throw new ArgumentException("Неверный формат времени.");
-                        _schedulerService.CancelScheduledDailyTask(commandName, timeToDelete);
-                        await botClient.SendTextMessageAsync(message.Chat.Id, $"Ежедневная задача {commandName} на {parts[3]} отменена.");
+
+                        var deleteDailyResult = _schedulerService.CancelScheduledDailyTask(commandName, timeToDelete);
+                        await botClient.SendTextMessageAsync(message.Chat.Id, deleteDailyResult.Message);
                         break;
                     case "delete":
-                        _schedulerService.CancelAllScheduledTasks(commandName);
-                        await botClient.SendTextMessageAsync(message.Chat.Id, $"Все задачи для команды {commandName} отменены.");
-                        break;
-                    case "help":
-                        var helpMessage = "Команда /schedule позволяет планировать выполнение других команд с определенной периодичностью или в конкретное время. Вот доступные форматы команды:\n" +
-                            "/schedule interval [имя_команды] [интервал] - Запланировать выполнение команды с указанным интервалом. Интервал задается в формате ЧЧ:ММ (например, 00:30 для 30 минут).\n" +
-                            "/schedule daily [имя_команды] [время] - Запланировать ежедневное выполнение команды в указанное время. Время задается в формате ЧЧ:ММ (например, 08:00 для запуска в 8 утра).\n" +
-                            "/schedule delete_interval [имя_команды] - Отменить циклическое выполнение запланированной команды.\n" +
-                            "/schedule delete_daily [имя_команды] [время] - Отменить ежедневное выполнение запланированной команды, запланированное на указанное время.\n" +
-                            "/schedule delete [имя_команды] - Отменить все запланированные задачи для указанной команды.\n" +
-                            "/schedule help - Показать это справочное сообщение.";
-                        await botClient.SendTextMessageAsync(message.Chat.Id, helpMessage);
-                        break;
-                    default:
-                        await botClient.SendTextMessageAsync(message.Chat.Id, "Неизвестное действие.");
+                        var deleteResult = _schedulerService.CancelAllScheduledTasks(commandName);
+                        await botClient.SendTextMessageAsync(message.Chat.Id, deleteResult.Message);
                         break;
                 }
             }

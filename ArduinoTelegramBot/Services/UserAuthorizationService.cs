@@ -1,15 +1,16 @@
 ﻿using Serilog;
 using ArduinoTelegramBot.Services.Interfaces;
 using ArduinoTelegramBot.Models;
+using System.Collections.Concurrent;
 
 namespace ArduinoTelegramBot.Services;
 
 public class UserAuthorizationService : IUserAuthorizationService
 {
-    private Dictionary<long, string> _userKeys = new Dictionary<long, string>();
-    private readonly Dictionary<long, DateTime> _lastChecked = new Dictionary<long, DateTime>();
-    private static readonly Dictionary<string, AccessKey> _permissions = new(); // Словарь для кэширования объектов AccessKey
-    private const int CacheDurationInMinutes = 1; //длительность кэширования проверки ключа, в минутх
+    private ConcurrentDictionary<long, string> _userKeys = new ConcurrentDictionary<long, string>();
+    private ConcurrentDictionary<long, DateTime> _lastChecked = new ConcurrentDictionary<long, DateTime>();
+    private static readonly ConcurrentDictionary<string, AccessKey> _permissions = new ConcurrentDictionary<string, AccessKey>();
+    private const int CacheDurationInMinutes = 1;
     private readonly IPermissionsDatabaseService _permissionsDatabase;
 
     public UserAuthorizationService(IPermissionsDatabaseService permissionsDatabase)
@@ -22,13 +23,13 @@ public class UserAuthorizationService : IUserAuthorizationService
     {
         try
         {
-            Log.Information("Сервис авторизации: Начинается загрузка данных авторизации пользователей...");
+            Log.Information("Сервис авторизации: Начинается загрузка данных авторизации пользователей");
             _userKeys = await _permissionsDatabase.LoadUserKeysAsync();
-            Log.Information("Сервис авторизации: Данные авторизации пользователей успешно загружены. Загружено {Count} записей.", _userKeys.Count);
+            Log.Information("Сервис авторизации: Данные авторизации пользователей успешно загружены. Загружено {Count} записей", _userKeys.Count);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Сервис авторизации: Произошла ошибка при загрузке данных авторизации пользователей.");
+            Log.Error(ex, "Сервис авторизации: Произошла ошибка при загрузке данных авторизации пользователей");
         }
     }
 
@@ -40,8 +41,8 @@ public class UserAuthorizationService : IUserAuthorizationService
             try
             {
                 var accessKey = await _permissionsDatabase.GetPermissionsAsync(key);
-                _lastChecked[userId] = DateTime.UtcNow; // Обновляем время последней успешной проверки.
-                _permissions[key] = accessKey; // Обновляем кэшированный объект AccessKey для ключа.
+                _lastChecked[userId] = DateTime.UtcNow;
+                _permissions[key] = accessKey; //обновляем кэшированный объект AccessKey для ключа
 
                 return accessKey.IsMasterKey || (accessKey.AvailableCommands?.Contains(commandName, StringComparer.InvariantCultureIgnoreCase) ?? false);
             }
@@ -52,7 +53,7 @@ public class UserAuthorizationService : IUserAuthorizationService
         }
         else
         {
-            // Если ключ находится в кэше и не истекло время кэширования, проверяем доступность команды.
+            //если ключ находится в кэше и не истекло время кэширования, проверяем доступность команды
             var cachedAccessKey = _permissions[key];
             return cachedAccessKey.IsMasterKey || (cachedAccessKey.AvailableCommands?.Contains(commandName, StringComparer.InvariantCultureIgnoreCase) ?? false);
         }
@@ -69,14 +70,14 @@ public class UserAuthorizationService : IUserAuthorizationService
             {
                 _userKeys[userId] = key;
                 _lastChecked[userId] = DateTime.UtcNow;
-                _permissions[key] = accessKey; // Обновляем кэшированный объект AccessKey.
-                await _permissionsDatabase.SaveUserKeysAsync(_userKeys); // Сохраняем обновленные данные авторизации.
+                _permissions[key] = accessKey; //Обновляем кэшированный объект AccessKey
+                await _permissionsDatabase.SaveUserKeysAsync(_userKeys); //сохраняем обновленные данные авторизации.
             }
         }
-        catch (KeyNotFoundException)
+        catch (KeyNotFoundException ex)
         {
-            // Логируем на уровне выше, просто пробрасываем исключение.
-            throw;
+            //Log.Warning(ex.Message);
+            throw; //logiruen na lvl vishe
         }
     }
 
