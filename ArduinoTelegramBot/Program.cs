@@ -51,6 +51,7 @@ class Program
         services.AddSingleton<ISerialDataHandler, SerialDataHandler>();
         services.AddSingleton<ICommandHandler, CommandHandler>();
         services.AddSingleton<IPermissionsDatabaseService, PermissionsDatabaseService>();
+        services.AddSingleton<ISchedulerService, SchedulerService>();
 
         #region команды не требующие авторизации
         services.AddTransient<ICommand>(serviceProvider => DefaultCommand.Create("/default"));
@@ -67,12 +68,14 @@ class Program
         services.AddTransient<IAuthorizedCommand>(serviceProvider => GetTemperatureDataCommand.Create(serviceProvider, "/temp"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => CloseSerialPortCommand.Create(serviceProvider, "/close_serial"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => OpenSerialPortCommand.Create(serviceProvider, "/open_serial"));
+        services.AddTransient<IAuthorizedCommand>(serviceProvider => ScheduleCommand.Create(serviceProvider, "/shedule"));
         #endregion
         #region обработчики полученных данных с ардуинки
         services.AddTransient<ISerialDataProcessor, TemperatureDataProcessor>();
         services.AddTransient<ISerialDataProcessor, DefaultDataProcessor>(); //обязательно оставить в самом низу списка процессоров, так как регулярка этого процессора подходит под все полученные данные. Те процессоры, что расположены ниже этого работать не будут, так как выполнится этот
         #endregion
         services.AddHostedService<BotService>();
+        services.AddHostedService(provider => provider.GetRequiredService<ISchedulerService>() as SchedulerService);
 
         Log.Debug("Program: Сервисы настроены");
     });
