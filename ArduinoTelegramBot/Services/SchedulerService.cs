@@ -11,20 +11,19 @@ namespace ArduinoTelegramBot.Services
     public class SchedulerService : ISchedulerService, IHostedService, IDisposable
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger _logger = Log.ForContext<SchedulerService>();
         private List<(Timer Timer, string ChatId, IAuthorizedCommand Command)> _timers = new();
 
         public SchedulerService(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            _logger.Information("Планировщик задач: Сервис инициализирован.");
+            Log.Information("Планировщик задач: Сервис инициализирован.");
         }
 
         public void ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval)
         {
             var timer = new Timer(Callback, (command, chatId), interval, interval);
             _timers.Add((timer, chatId, command));
-            _logger.Information("Планировщик задач: Команда запланирована для чата {chatId} с интервалом {interval}", chatId, interval);
+            Log.Information("Планировщик задач: Команда запланирована для чата {chatId} с интервалом {interval}", chatId, interval);
         }
 
         private void Callback(object state)
@@ -37,18 +36,18 @@ namespace ArduinoTelegramBot.Services
                 try
                 {
                     command.ExecuteAsync(botClient, message).Wait();
-                    _logger.Information("Планировщик задач: Команда выполнена для чата {chatId}", chatId);
+                    Log.Information("Планировщик задач: Команда выполнена для чата {chatId}", chatId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error(ex, "Планировщик задач: Ошибка при выполнении команды для чата {chatId}", chatId);
+                    Log.Error(ex, "Планировщик задач: Ошибка при выполнении команды для чата {chatId}", chatId);
                 }
             }
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.Information("Планировщик задач: Сервис запущен");
+            Log.Information("Планировщик задач: Сервис запущен");
             return Task.CompletedTask;
         }
 
@@ -59,7 +58,7 @@ namespace ArduinoTelegramBot.Services
                 Timer?.Dispose();
             }
             _timers.Clear();
-            _logger.Information("Планировщик задач: Сервис остановлен");
+            Log.Information("Планировщик задач: Сервис остановлен");
             return Task.CompletedTask;
         }
 
@@ -69,7 +68,7 @@ namespace ArduinoTelegramBot.Services
             {
                 Timer?.Dispose();
             }
-            _logger.Information("Планировщик задач: Ресурсы освобождены");
+            Log.Information("Планировщик задач: Ресурсы освобождены");
         }
     }
 }
