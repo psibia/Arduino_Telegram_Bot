@@ -95,4 +95,41 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         await File.WriteAllTextAsync(_serialPortConfigFile, jsonConfig);
         Log.Information($"Конфигурация последовательного порта сохранена в {_serialPortConfigFile}");
     }
+
+
+
+
+
+    private readonly string _tasksFilePath = "scheduledTasks.json";
+
+    public async Task SaveScheduledTaskAsync(ScheduledTaskData taskData)
+    {
+        List<ScheduledTaskData> tasks = await LoadScheduledTasksAsync();
+        tasks.Add(taskData);
+        var json = JsonConvert.SerializeObject(tasks, Formatting.Indented);
+        await File.WriteAllTextAsync(_tasksFilePath, json);
+    }
+
+    public async Task DeleteScheduledTaskAsync(string commandName, string chatId)
+    {
+        List<ScheduledTaskData> tasks = await LoadScheduledTasksAsync();
+        var taskToRemove = tasks.FirstOrDefault(task => task.CommandName == commandName && task.ChatId == chatId);
+        if (taskToRemove != null)
+        {
+            tasks.Remove(taskToRemove);
+            var json = JsonConvert.SerializeObject(tasks, Formatting.Indented);
+            await File.WriteAllTextAsync(_tasksFilePath, json);
+        }
+    }
+
+    public async Task<List<ScheduledTaskData>> LoadScheduledTasksAsync()
+    {
+        if (!File.Exists(_tasksFilePath))
+        {
+            return new List<ScheduledTaskData>();
+        }
+
+        var json = await File.ReadAllTextAsync(_tasksFilePath);
+        return JsonConvert.DeserializeObject<List<ScheduledTaskData>>(json) ?? new List<ScheduledTaskData>();
+    }
 }

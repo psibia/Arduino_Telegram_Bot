@@ -166,7 +166,7 @@ namespace ArduinoTelegramBot.Commands.System
             }
 
             var commandName = parameters[0];
-            var result = _schedulerService.CancelScheduledCommand(commandName);
+            var result = _schedulerService.CancelScheduledCommand(commandName, message.Chat.Id.ToString());//исправить эту ебанину, chatid имеет тип long, я хз почему перешел на string в какой-то момент, видимо, спутал с апи-токеном
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 

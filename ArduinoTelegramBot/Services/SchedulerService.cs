@@ -12,12 +12,16 @@ namespace ArduinoTelegramBot.Services
     public class SchedulerService : ISchedulerService, IHostedService, IDisposable
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly IPermissionsDatabaseService _permissionsDatabaseService;
+        private readonly ICommandFactory _commandFactory;
         private List<SchedulerTimerInfo> _timers = new List<SchedulerTimerInfo>();
 
-        public SchedulerService(IServiceProvider serviceProvider)
+        public SchedulerService(IServiceProvider serviceProvider, IPermissionsDatabaseService permissionsDatabaseService, ICommandFactory commandFactory)
         {
             _serviceProvider = serviceProvider;
+            _permissionsDatabaseService = permissionsDatabaseService;
             Log.Information("Планировщик задач: Сервис инициализирован");
+            _commandFactory = commandFactory;
         }
 
         public ScheduleOperationResult ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval)
@@ -27,11 +31,29 @@ namespace ArduinoTelegramBot.Services
                 return ScheduleOperationResult.Error($"Циклическое выполнение команды {command.Name} уже запланировано");
             }
 
-            var schedulerTimerInfo = new SchedulerTimerInfo { Command = command, ChatId = chatId, Interval = interval };
-            var timer = new Timer(Callback, schedulerTimerInfo, interval, interval);
-            schedulerTimerInfo.Timer = timer; // Убедитесь, что таймер также установлен в SchedulerTimerInfo
+            var schedulerTimerInfo = new SchedulerTimerInfo
+            {
+                Command = command,
+                ChatId = chatId,
+                Interval = interval,
+                DailyTime = null
+            };
 
-            _timers.Add(schedulerTimerInfo); // Используйте полностью инициализированный экземпляр
+            //var timer = new Timer(Callback, schedulerTimerInfo, TimeSpan.Zero, interval); //эта реализация позволит запустить команду сразу в момент постановки задачи
+            var timer = new Timer(Callback, schedulerTimerInfo, interval, interval); 
+            schedulerTimerInfo.Timer = timer;
+            _timers.Add(schedulerTimerInfo);
+
+            var taskData = new ScheduledTaskData
+            {
+                CommandName = command.Name,
+                ChatId = chatId,
+                Interval = interval,
+                DailyTime = null
+            };
+
+            _permissionsDatabaseService.SaveScheduledTaskAsync(taskData).Wait();
+
             Log.Information("Планировщик задач: Команда {CommandName} запланирована для чата {ChatId} с интервалом {Interval}", command.Name, chatId, interval);
             return ScheduleOperationResult.Ok($"Запланировано циклическое выполнение команды {command.Name} с интервалом {interval}");
         }
@@ -52,24 +74,24 @@ namespace ArduinoTelegramBot.Services
             return ScheduleOperationResult.Ok($"Ежедневная задача {command.Name} успешно запланирована на {dailyTime}.");
         }
 
-        public ScheduleOperationResult CancelScheduledCommand(string commandName)
+        public ScheduleOperationResult CancelScheduledCommand(string commandName, string chatId)
         {
-            var timersToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase)).ToList();
+            var timersToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId).ToList();
             if (!timersToRemove.Any())
             {
                 return ScheduleOperationResult.Error($"Задача на циклическое выполнение команды {commandName} не найдена.");
             }
-            _timers.RemoveAll(timerInfo =>
+
+            foreach (var timerInfo in timersToRemove)
             {
-                if (timerInfo.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase))
-                {
-                    timerInfo.Timer.Dispose();
-                    Log.Information("Планировщик задач: Отмена задачи {CommandName}", commandName);
-                    return true;
-                }
-                return false;
-            });
-            return ScheduleOperationResult.Ok($"Циклическое выполнение задачи {commandName} успешно отменено.");
+                timerInfo.Timer.Dispose();
+                _timers.Remove(timerInfo);
+                Log.Information("Планировщик задач: Отмена циклической задачи {CommandName} для chatId {ChatId}", commandName, chatId);
+                //удаление задачи из файла базы данных
+                Task.Run(async () => await _permissionsDatabaseService.DeleteScheduledTaskAsync(commandName, chatId)).Wait();
+            }
+
+            return ScheduleOperationResult.Ok($"Циклическое выполнение задачи {commandName} для успешно отменено.");
         }
 
         public ScheduleOperationResult CancelScheduledDailyTask(string commandName, TimeSpan taskTime)
@@ -150,10 +172,29 @@ namespace ArduinoTelegramBot.Services
             }
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
-            Log.Information("Планировщик задач: Сервис запущен");
-            return Task.CompletedTask;
+            var scheduledTasksData = await _permissionsDatabaseService.LoadScheduledTasksAsync();
+            foreach (var taskData in scheduledTasksData)
+            {
+                var command = _commandFactory.CreateCommand(taskData.CommandName);
+                if (command != null)
+                {
+                    if (taskData.DailyTime.HasValue)
+                    {
+                        ScheduleDailyTask(command, taskData.ChatId, taskData.DailyTime.Value);
+                    }
+                    else
+                    {
+                        ScheduleCommand(command, taskData.ChatId, taskData.Interval);
+                    }
+                }
+                else
+                {
+                    Log.Warning($"Command {taskData.CommandName} not found.");
+                }
+            }
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

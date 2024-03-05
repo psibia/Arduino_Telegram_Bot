@@ -52,6 +52,7 @@ class Program
         services.AddSingleton<ICommandHandler, CommandHandler>();
         services.AddSingleton<IPermissionsDatabaseService, PermissionsDatabaseService>();
         services.AddSingleton<ISchedulerService, SchedulerService>();
+        services.AddTransient<ICommandFactory, CommandFactory>();
 
         #region команды не требующие авторизации
         services.AddTransient<ICommand>(serviceProvider => DefaultCommand.Create("/default"));
