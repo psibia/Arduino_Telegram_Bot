@@ -5,10 +5,10 @@ namespace ArduinoTelegramBot.Services.Interfaces
 {
     public interface ISchedulerService
     {
-        public OperationResult ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval);
-        OperationResult ScheduleDailyTask(IAuthorizedCommand command, string chatId, TimeSpan dailyTime);
-        OperationResult CancelScheduledCommand(string commandName);
-        OperationResult CancelScheduledDailyTask(string commandName, TimeSpan taskTime);
-        OperationResult CancelAllScheduledTasks(string commandName);
+        public ScheduleOperationResult ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval);
+        ScheduleOperationResult ScheduleDailyTask(IAuthorizedCommand command, string chatId, TimeSpan dailyTime);
+        ScheduleOperationResult CancelScheduledCommand(string commandName);
+        ScheduleOperationResult CancelScheduledDailyTask(string commandName, TimeSpan taskTime);
+        ScheduleOperationResult CancelAllScheduledTasks(string commandName);
     }
 }

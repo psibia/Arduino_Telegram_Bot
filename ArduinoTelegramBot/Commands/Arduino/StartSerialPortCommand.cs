@@ -39,7 +39,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
 
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
         {
-            ActionStatusResult openPortResult = null;
+            SerialPortOperationResult openPortResult = null;
             string[] args = message.Text.Split(' ');
             if (args.Length >= 2)
             {

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ArduinoTelegramBot.Models
 {
-    public class TimerInfo
+    public class SchedulerTimerInfo
     {
         public Timer Timer { get; set; }
         public string ChatId { get; set; }

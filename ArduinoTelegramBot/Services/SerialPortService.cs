@@ -51,22 +51,22 @@ namespace ArduinoTelegramBot.Services
             Log.Information("Сервис последовательного порта: SerialPort настроен для получения данных.");
         }
 
-        public async Task<ActionStatusResult> ListAvailablePortsAsync()
+        public async Task<SerialPortOperationResult> ListAvailablePortsAsync()
         {
             try
             {
                 string[] ports = SerialPort.GetPortNames();
                 Log.Information("Сервис последовательного порта: Запрос доступных портов выполнен.");
-                return ActionStatusResult.Ok("Доступные порты получены.", ports);
+                return SerialPortOperationResult.Ok("Доступные порты получены.", ports);
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Сервис последовательного порта: Ошибка при получении списка доступных портов.");
-                return ActionStatusResult.Error("Ошибка при получении списка доступных портов.");
+                return SerialPortOperationResult.Error("Ошибка при получении списка доступных портов.");
             }
         }
 
-        public async Task<ActionStatusResult> TryOpenPortAsync()
+        public async Task<SerialPortOperationResult> TryOpenPortAsync()
         {
             try
             {
@@ -74,76 +74,76 @@ namespace ArduinoTelegramBot.Services
                 {
                     _serialPort.Open();
                     Log.Information($"Сервис последовательного порта: SerialPort успешно открыт: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
-                    return ActionStatusResult.Ok($"Порт успешно открыт с параметрами: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
+                    return SerialPortOperationResult.Ok($"Порт успешно открыт с параметрами: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
                 }
                 else
                 {
-                    return ActionStatusResult.Error($"Порт {_serialPort.PortName} уже открыт.");
+                    return SerialPortOperationResult.Error($"Порт {_serialPort.PortName} уже открыт.");
                 }
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Сервис последовательного порта: Ошибка при открытии SerialPort: {ex}", ex.Message);
-                return ActionStatusResult.Error($"Ошибка при открытии порта: {ex.Message}");
+                return SerialPortOperationResult.Error($"Ошибка при открытии порта: {ex.Message}");
             }
         }
 
 
         public SerialPort CurrentSerialPort() => _serialPort;
 
-        public async Task<ActionStatusResult> ClosePortAsync()
+        public async Task<SerialPortOperationResult> ClosePortAsync()
         {
             if (_serialPort.IsOpen)
             {
                 _serialPort.Close();
                 Log.Information("Сервис последовательного порта: SerialPort {sp} закрыт", _serialPort.PortName);
-                return ActionStatusResult.Ok($"Порт {_serialPort.PortName} успешно закрыт.");
+                return SerialPortOperationResult.Ok($"Порт {_serialPort.PortName} успешно закрыт.");
             }
             else
             {
                 Log.Information("Сервис последовательного порта: SerialPort {sp} уже закрыт или не был открыт.", _serialPort.PortName);
-                return ActionStatusResult.Error($"Порт {_serialPort.PortName} уже закрыт или не был открыт.");
+                return SerialPortOperationResult.Error($"Порт {_serialPort.PortName} уже закрыт или не был открыт.");
             }
         }
 
 
-        public async Task<ActionStatusResult> SendDataAsync(string data)
+        public async Task<SerialPortOperationResult> SendDataAsync(string data)
         {
             if (_serialPort.IsOpen)
             {
                 _serialPort.Write(data);
                 Log.Information("Сервис последовательного порта: Данные отправлены в SerialPort {sp}: {data}", _serialPort.PortName, data);
-                return ActionStatusResult.Ok("Данные отправлены.");
+                return SerialPortOperationResult.Ok("Данные отправлены.");
             }
             else
             {
                 Log.Warning("Сервис последовательного порта: Попытка отправить данные в SerialPort завершилась неудачей - порт не открыт.");
-                return ActionStatusResult.Error($"Порт не открыт.");
+                return SerialPortOperationResult.Error($"Порт не открыт.");
             }
         }
 
-        public async Task<ActionStatusResult> SendBinaryDataAsync(byte[] data)
+        public async Task<SerialPortOperationResult> SendBinaryDataAsync(byte[] data)
         {
             try
             {
                 if (!_serialPort.IsOpen)
                 {
-                    return ActionStatusResult.Error("Порт не открыт. Отправка данных невозможна.");
+                    return SerialPortOperationResult.Error("Порт не открыт. Отправка данных невозможна.");
                 }
 
                 _serialPort.Write(data, 0, data.Length);
                 Log.Information("Сервис последовательного порта: Бинарные данные успешно отправлены: {data}", BitConverter.ToString(data));
-                return ActionStatusResult.Ok($"Бинарные данные успешно отправлены: {BitConverter.ToString(data)}.");
+                return SerialPortOperationResult.Ok($"Бинарные данные успешно отправлены: {BitConverter.ToString(data)}.");
             }
             catch (TimeoutException ex)
             {
                 Log.Error(ex, "Сервис последовательного порта: Превышено время ожидания для отправки данных в {pn}", _serialPort.PortName);
-                return ActionStatusResult.Error("Превышено время ожидания для отправки данных.");
+                return SerialPortOperationResult.Error("Превышено время ожидания для отправки данных.");
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Сервис последовательного порта: Произошла ошибка при отправке данных в {pn}: {msg}", _serialPort.PortName, ex.Message);
-                return ActionStatusResult.Error($"Произошла ошибка при отправке данных: {ex.Message}.");
+                return SerialPortOperationResult.Error($"Произошла ошибка при отправке данных: {ex.Message}.");
             }
         }
     }

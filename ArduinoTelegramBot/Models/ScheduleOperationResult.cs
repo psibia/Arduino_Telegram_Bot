@@ -6,25 +6,25 @@ using System.Threading.Tasks;
 
 namespace ArduinoTelegramBot.Models
 {
-    public class OperationResult
+    public class ScheduleOperationResult
     {
         public bool Success { get; private set; }
         public string Message { get; private set; }
 
-        private OperationResult(bool success, string message)
+        private ScheduleOperationResult(bool success, string message)
         {
             Success = success;
             Message = message;
         }
 
-        public static OperationResult Ok(string message)
+        public static ScheduleOperationResult Ok(string message)
         {
-            return new OperationResult(true, message);
+            return new ScheduleOperationResult(true, message);
         }
 
-        public static OperationResult Fail(string message)
+        public static ScheduleOperationResult Error(string message)
         {
-            return new OperationResult(false, message);
+            return new ScheduleOperationResult(false, message);
         }
     }
 }

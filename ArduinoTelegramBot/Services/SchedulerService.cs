@@ -12,48 +12,48 @@ namespace ArduinoTelegramBot.Services
     public class SchedulerService : ISchedulerService, IHostedService, IDisposable
     {
         private readonly IServiceProvider _serviceProvider;
-        private List<TimerInfo> _timers = new List<TimerInfo>();
+        private List<SchedulerTimerInfo> _timers = new List<SchedulerTimerInfo>();
 
         public SchedulerService(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            Log.Information("Планировщик задач: Сервис инициализирован.");
+            Log.Information("Планировщик задач: Сервис инициализирован");
         }
 
-        public OperationResult ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval)
+        public ScheduleOperationResult ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval)
         {
             if (_timers.Any(t => t.Command.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId))
             {
-                return OperationResult.Fail($"Команда {command.Name} уже запланирована для чата {chatId}.");
+                return ScheduleOperationResult.Error($"Циклическое выполнение команды {command.Name} уже запланировано");
             }
 
-            var timer = new Timer(Callback, new TimerInfo { Command = command, ChatId = chatId }, interval, interval);
-            _timers.Add(new TimerInfo { Timer = timer, ChatId = chatId, Command = command });
+            var timer = new Timer(Callback, new SchedulerTimerInfo { Command = command, ChatId = chatId }, interval, interval);
+            _timers.Add(new SchedulerTimerInfo { Timer = timer, ChatId = chatId, Command = command });
             Log.Information("Планировщик задач: Команда {CommandName} запланирована для чата {ChatId} с интервалом {Interval}", command.Name, chatId, interval);
-            return OperationResult.Ok($"Запланировано циклическое выполнение команды {command.Name} с интервалом {interval}");
+            return ScheduleOperationResult.Ok($"Запланировано циклическое выполнение команды {command.Name} с интервалом {interval}");
         }
 
-        public OperationResult ScheduleDailyTask(IAuthorizedCommand command, string chatId, TimeSpan dailyTime)
+        public ScheduleOperationResult ScheduleDailyTask(IAuthorizedCommand command, string chatId, TimeSpan dailyTime)
         {
             if (_timers.Any(t => t.Command.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId && t.DailyTime == dailyTime))
             {
-                return OperationResult.Fail($"Ежедневная задача {command.Name} уже запланирована для чата {chatId} на {dailyTime}.");
+                return ScheduleOperationResult.Error($"Ежедневная задача {command.Name} уже запланирована для чата {chatId} на {dailyTime}.");
             }
             var now = DateTime.Now;
             var firstRunTime = now.TimeOfDay > dailyTime ? now.Date.AddDays(1).Add(dailyTime) : now.Date.Add(dailyTime);
             var initialDelay = firstRunTime - now;
-            var timer = new Timer(Callback, new TimerInfo { Command = command, ChatId = chatId, DailyTime = dailyTime }, initialDelay, TimeSpan.FromDays(1));
-            _timers.Add(new TimerInfo { Timer = timer, ChatId = chatId, Command = command, DailyTime = dailyTime });
+            var timer = new Timer(Callback, new SchedulerTimerInfo { Command = command, ChatId = chatId, DailyTime = dailyTime }, initialDelay, TimeSpan.FromDays(1));
+            _timers.Add(new SchedulerTimerInfo { Timer = timer, ChatId = chatId, Command = command, DailyTime = dailyTime });
             Log.Information("Планировщик задач: Ежедневная задача {CommandName} запланирована для чата {ChatId} на {DailyTime}", command.Name, chatId, dailyTime);
-            return OperationResult.Ok($"Ежедневная задача {command.Name} успешно запланирована на {dailyTime}");
+            return ScheduleOperationResult.Ok($"Ежедневная задача {command.Name} успешно запланирована на {dailyTime}.");
         }
 
-        public OperationResult CancelScheduledCommand(string commandName)
+        public ScheduleOperationResult CancelScheduledCommand(string commandName)
         {
             var timersToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase)).ToList();
             if (!timersToRemove.Any())
             {
-                return OperationResult.Fail($"Команда {commandName} не найдена.");
+                return ScheduleOperationResult.Error($"Задача на циклическое выполнение команды {commandName} не найдена.");
             }
             _timers.RemoveAll(timerInfo =>
             {
@@ -65,15 +65,15 @@ namespace ArduinoTelegramBot.Services
                 }
                 return false;
             });
-            return OperationResult.Ok($"Итерационное выполнение задачи {commandName} успешно отменено.");
+            return ScheduleOperationResult.Ok($"Циклическое выполнение задачи {commandName} успешно отменено.");
         }
 
-        public OperationResult CancelScheduledDailyTask(string commandName, TimeSpan taskTime)
+        public ScheduleOperationResult CancelScheduledDailyTask(string commandName, TimeSpan taskTime)
         {
             var timersToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase) && t.DailyTime == taskTime).ToList();
             if (!timersToRemove.Any())
             {
-                return OperationResult.Fail($"Ежедневная задача {commandName} на {taskTime} не найдена.");
+                return ScheduleOperationResult.Error($"Ежедневная задача {commandName} на {taskTime} не найдена.");
             }
             _timers.RemoveAll(timerInfo =>
             {
@@ -85,16 +85,16 @@ namespace ArduinoTelegramBot.Services
                 }
                 return false;
             });
-            return OperationResult.Ok($"Ежедневная задача {commandName} на {taskTime} успешно отменена.");
+            return ScheduleOperationResult.Ok($"Ежедневная задача {commandName} на {taskTime} успешно отменена.");
         }
 
-        public OperationResult CancelAllScheduledTasks(string commandName)
+        public ScheduleOperationResult CancelAllScheduledTasks(string commandName)
         {
             var timersToRemove = _timers.Where(timerInfo => timerInfo.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase)).ToList();
 
             if (!timersToRemove.Any())
             {
-                return OperationResult.Fail($"Команда {commandName} не найдена или для неё не запланированы задачи.");
+                return ScheduleOperationResult.Error($"Команда {commandName} не найдена или для неё не запланированы задачи.");
             }
 
             foreach (var timerInfo in timersToRemove)
@@ -104,12 +104,12 @@ namespace ArduinoTelegramBot.Services
                 Log.Information("Планировщик задач: Полная отмена задач {CommandName}", commandName);
             }
 
-            return OperationResult.Ok($"Полная отмена задач для команды: {commandName}");
+            return ScheduleOperationResult.Ok($"Полная отмена задач для команды: {commandName}");
         }
 
         private void Callback(object state)
         {
-            var timerInfo = (TimerInfo)state;
+            var timerInfo = (SchedulerTimerInfo)state;
             using (var scope = _serviceProvider.CreateScope())
             {
                 var botClient = scope.ServiceProvider.GetRequiredService<ITelegramBotClient>();

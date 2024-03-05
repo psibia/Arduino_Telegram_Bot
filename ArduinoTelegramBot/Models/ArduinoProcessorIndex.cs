@@ -3,12 +3,12 @@ using System.Text.RegularExpressions;
 
 namespace ArduinoTelegramBot.Models
 {
-    public class ProcessorIndex
+    public class ArduinoProcessorIndex
     {
         public Regex Pattern { get; }
         public ISerialDataProcessor Processor { get; }
 
-        public ProcessorIndex(Regex pattern, ISerialDataProcessor processor)
+        public ArduinoProcessorIndex(Regex pattern, ISerialDataProcessor processor)
         {
             Pattern = pattern;
             Processor = processor;

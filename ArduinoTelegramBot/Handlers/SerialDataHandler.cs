@@ -11,14 +11,14 @@ namespace ArduinoTelegramBot.Handlers
     public class SerialDataHandler : ISerialDataHandler
     {
         private readonly ITelegramBotClient _botClient;
-        private readonly List<ProcessorIndex> _processorIndexes;
+        private readonly List<ArduinoProcessorIndex> _processorIndexes;
         private readonly IServiceProvider _serviceProvider;
 
         public SerialDataHandler(ITelegramBotClient botClient, IEnumerable<ISerialDataProcessor> processors, IServiceProvider serviceProvider)
         {
             _botClient = botClient;
             _serviceProvider = serviceProvider;
-            _processorIndexes = processors.Select(p => new ProcessorIndex(p.Pattern, p)).ToList();
+            _processorIndexes = processors.Select(p => new ArduinoProcessorIndex(p.Pattern, p)).ToList();
         }
 
         public async Task HandleReceivedDataAsync(string data, long chatId)
