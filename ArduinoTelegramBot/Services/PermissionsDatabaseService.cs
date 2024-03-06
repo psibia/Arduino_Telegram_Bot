@@ -3,6 +3,7 @@ using ArduinoTelegramBot.Models.Sheduler;
 using ArduinoTelegramBot.Services.Interfaces;
 using Newtonsoft.Json;
 using Serilog;
+using System;
 using System.Collections.Concurrent;
 using System.IO.Ports;
 
@@ -24,7 +25,7 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
 
         if (accessKey != null)
         {
-            Log.Information("База данных: Доступ к ключу '{Key}' успешно получен.", key);
+            Log.Information("База данных: Доступ к ключу '{Key}' успешно получен. Активен: {IsActive}, Мастер-ключ: {IsMasterKey}.", key, accessKey.IsActive, accessKey.IsMasterKey);
             return accessKey;
         }
         else
@@ -34,9 +35,6 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         }
     }
 
-
-
-
     private static readonly string _authDataFilePath = "authData.json";
     public async Task<ConcurrentDictionary<long, string>> LoadUserKeysAsync()
     {
@@ -45,13 +43,13 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
             var json = await File.ReadAllTextAsync(_authDataFilePath);
             var userKeys = JsonConvert.DeserializeObject<ConcurrentDictionary<long, string>>(json) ?? new ConcurrentDictionary<long, string>();
 
-            Log.Information("База данных: Ключи пользователя успешно загружены");
-            Log.Debug("База данных: Загруженные ключи пользователей: {UserKeys}", json);
+            Log.Information("База данных: Ключи пользователя успешно загружены из файла '{FilePath}'.", _authDataFilePath);
+            Log.Debug("База данных: Загруженные ключи пользователей:\n{UserKeys}", json);
             return userKeys;
         }
         else
         {
-            Log.Warning("В БД не найдены авторизационные данные, начинаем с пустого набора ключей пользователей.");
+            Log.Warning("База данных: Файл авторизационных данных '{FilePath}' не найден, начинаем с пустого набора ключей пользователей.", _authDataFilePath);
             return new ConcurrentDictionary<long, string>();
         }
     }
@@ -60,12 +58,9 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
     {
         var json = JsonConvert.SerializeObject(userKeys, Formatting.Indented);
         await File.WriteAllTextAsync(_authDataFilePath, json);
-        Log.Information("База данных: Ключи пользователей успешно сохранены");
+        Log.Information("База данных: Ключи пользователей успешно сохранены в файл '{FilePath}'.", _authDataFilePath);
         Log.Debug("База данных: Сохраненные ключи пользователей: {UserKeys}", json);
     }
-
-
-
 
     private readonly string _serialPortConfigFile = "SerialPortConfig.json";
     public async Task<(string PortName, int BaudRate, Parity Parity, int DataBits, StopBits StopBits)> LoadSerialPortConfigAsync()
@@ -74,11 +69,11 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         {
             string jsonConfig = await File.ReadAllTextAsync(_serialPortConfigFile);
             var config = JsonConvert.DeserializeObject<dynamic>(jsonConfig);
-            Log.Information($"Конфигурация последовательного порта загружена из {_serialPortConfigFile}");
+            Log.Information("База данных: Конфигурация последовательного порта загружена из файла '{FilePath}'.", _serialPortConfigFile);
             return (config.PortName, config.BaudRate, config.Parity, config.DataBits, config.StopBits);
         }
 
-        Log.Warning($"Конфигурационный файл {_serialPortConfigFile} не найден");
+        Log.Warning("База данных: Конфигурационный файл '{FilePath}' не найден.", _serialPortConfigFile);
         return default;
     }
 
@@ -94,12 +89,8 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         };
         string jsonConfig = JsonConvert.SerializeObject(config, Formatting.Indented);
         await File.WriteAllTextAsync(_serialPortConfigFile, jsonConfig);
-        Log.Information($"Конфигурация последовательного порта сохранена в {_serialPortConfigFile}");
+        Log.Information("База данных: Конфигурация последовательного порта сохранена в файл '{FilePath}'.", _serialPortConfigFile);
     }
-
-
-
-
 
     private readonly string _tasksFilePath = "scheduledTasks.json";
     public async Task SaveScheduledTaskAsync(ScheduledTaskData taskData)
@@ -108,6 +99,7 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         tasks.Add(taskData);
         var json = JsonConvert.SerializeObject(tasks, Formatting.Indented);
         await File.WriteAllTextAsync(_tasksFilePath, json);
+        Log.Information("База данных: Запланированная задача '{TaskId}' успешно сохранена.", taskData.TaskId);
     }
 
     public async Task DeleteScheduledTaskAsync(string taskId)
@@ -119,6 +111,11 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
             tasks.Remove(taskToRemove);
             var json = JsonConvert.SerializeObject(tasks, Formatting.Indented);
             await File.WriteAllTextAsync(_tasksFilePath, json);
+            Log.Information("База данных: Запланированная задача '{TaskId}' успешно удалена.", taskId);
+        }
+        else
+        {
+            Log.Warning("База данных: Запланированная задача '{TaskId}' не найдена для удаления.", taskId);
         }
     }
 
@@ -126,10 +123,13 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
     {
         if (!File.Exists(_tasksFilePath))
         {
+            Log.Warning("База данных: Файл запланированных задач '{FilePath}' не найден. Возвращается пустой список задач.", _tasksFilePath);
             return new List<ScheduledTaskData>();
         }
 
         var json = await File.ReadAllTextAsync(_tasksFilePath);
-        return JsonConvert.DeserializeObject<List<ScheduledTaskData>>(json) ?? new List<ScheduledTaskData>();
+        var tasks = JsonConvert.DeserializeObject<List<ScheduledTaskData>>(json) ?? new List<ScheduledTaskData>();
+        Log.Information("База данных: Запланированные задачи успешно загружены из файла '{FilePath}'.", _tasksFilePath);
+        return tasks;
     }
 }
