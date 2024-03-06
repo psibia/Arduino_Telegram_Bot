@@ -1,4 +1,5 @@
 ﻿using ArduinoTelegramBot.Models;
+using ArduinoTelegramBot.Models.Sheduler;
 using ArduinoTelegramBot.Services.Interfaces;
 using Newtonsoft.Json;
 using Serilog;
@@ -101,7 +102,6 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
 
 
     private readonly string _tasksFilePath = "scheduledTasks.json";
-
     public async Task SaveScheduledTaskAsync(ScheduledTaskData taskData)
     {
         List<ScheduledTaskData> tasks = await LoadScheduledTasksAsync();

@@ -1,15 +1,15 @@
 ﻿using ArduinoTelegramBot.Commands.Interfaces;
-using ArduinoTelegramBot.Models;
+using ArduinoTelegramBot.Models.Sheduler;
 
 namespace ArduinoTelegramBot.Services.Interfaces
 {
     public interface ISchedulerService
     {
-        ScheduleOperationResult ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval, bool isStartupLoad = false, string taskId = null);
-        ScheduleOperationResult ScheduleDailyTask(IAuthorizedCommand command, string chatId, TimeSpan dailyTime, bool isStartupLoad = false, string taskId = null);
-        ScheduleOperationResult CancelScheduledCommand(string commandName, string chatId);
-        ScheduleOperationResult CancelScheduledDailyTask(string commandName, string chatId, TimeSpan taskTime);
-        ScheduleOperationResult CancelAllScheduledTasks(string commandName, string chatId);
-        List<ScheduledTaskInfo> GetScheduledTasksForChat(string chatId);
+        Task<ScheduleOperationResult> ScheduleCycleTaskAsync(IAuthorizedCommand command, long chatId, TimeSpan interval, bool isStartupLoad = false, string taskId = null);
+        Task<ScheduleOperationResult> ScheduleDailyTaskAsync(IAuthorizedCommand command, long chatId, TimeSpan dailyTime, bool isStartupLoad = false, string taskId = null);
+        Task<ScheduleOperationResult> CancelScheduledCycleTaskAsync(string commandName, long chatId);
+        Task<ScheduleOperationResult> CancelScheduledDailyTaskAsync(string commandName, long chatId, TimeSpan taskTime);
+        Task<ScheduleOperationResult> CancelAllScheduledTasksAsync(string commandName, long chatId);
+        Task<List<ScheduledTaskInfo>> GetScheduledTasksForChatAsync(long chatId);
     }
 }

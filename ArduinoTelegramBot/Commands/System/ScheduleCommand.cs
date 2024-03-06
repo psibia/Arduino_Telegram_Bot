@@ -11,7 +11,7 @@ using Telegram.Bot;
 using ArduinoTelegramBot.Commands.Arduino;
 using System.Globalization;
 using Serilog;
-using ArduinoTelegramBot.Models;
+using ArduinoTelegramBot.Models.Sheduler;
 
 namespace ArduinoTelegramBot.Commands.System
 {
@@ -41,17 +41,17 @@ namespace ArduinoTelegramBot.Commands.System
             var parts = message.Text.Split(' ');
             if (parts.Length < 2)
             {
-                await botClient.SendTextMessageAsync(message.Chat.Id, "Неверный формат команды. Используйте /schedule help для справки.");
+                await botClient.SendTextMessageAsync(message.Chat.Id, $"Неверный формат команды. Используйте {this.Name} {ScheduleInputCommandActions.Help} для справки.");
                 return;
             }
 
             var action = parts[1].ToLower();
             switch (action)
             {
-                case ScheduleCommandActions.Help:
+                case ScheduleInputCommandActions.Help:
                     await SendHelpMessageAsync(botClient, message.Chat.Id);
                     break;
-                case ScheduleCommandActions.Get:
+                case ScheduleInputCommandActions.Get:
                     await HandleGetScheduledTasksAsync(botClient, message.Chat.Id);
                     break;
                 default:
@@ -62,13 +62,13 @@ namespace ArduinoTelegramBot.Commands.System
 
         private async Task SendHelpMessageAsync(ITelegramBotClient botClient, long chatId)
         {
-            var helpMessage = "Команда /schedule позволяет планировать выполнение других команд с определенной периодичностью или в конкретное время. Вот доступные форматы команды:\n" +
-                        $"/schedule {ScheduleCommandActions.Interval} [имя_команды] [интервал] - Запланировать выполнение команды с указанным интервалом. Интервал задается в форматах: [ЧЧ], [ЧЧ:ММ], [ЧЧ:ММ:СС] (например, 00:30 для 30 минут).\n" +
-                        $"/schedule {ScheduleCommandActions.Daily} [имя_команды] [время] - Запланировать ежедневное выполнение команды в указанное время. Время задается в форматах: [ЧЧ], [ЧЧ:ММ], [ЧЧ:ММ:СС] (например, 08:00 для запуска в 8 утра).\n" +
-                        $"/schedule {ScheduleCommandActions.DeleteInterval} [имя_команды] - Отменить циклическое выполнение запланированной команды.\n" +
-                        $"/schedule {ScheduleCommandActions.DeleteDaily} [имя_команды] [время] - Отменить ежедневное выполнение запланированной команды, запланированное на указанное время.\n" +
-                        $"/schedule {ScheduleCommandActions.Delete} [имя_команды] - Отменить все запланированные задачи для указанной команды.\n" +
-                        "/schedule help - Показать это справочное сообщение.";
+            var helpMessage = $"Команда {this.Name} позволяет планировать выполнение других команд с определенной периодичностью или в конкретное время. Вот доступные форматы команды:\n" +
+                $"{this.Name} {ScheduleInputCommandActions.Interval} [имя_команды] [интервал] - Запланировать выполнение команды с указанным интервалом. Интервал задается в форматах: [ЧЧ], [ЧЧ:ММ], [ЧЧ:ММ:СС] (например, 00:30 для 30 минут).\n" +
+                $"{this.Name} {ScheduleInputCommandActions.Daily} [имя_команды] [время] - Запланировать ежедневное выполнение команды в указанное время. Время задается в форматах: [ЧЧ], [ЧЧ:ММ], [ЧЧ:ММ:СС] (например, 08:00 для запуска в 8 утра).\n" +
+                $"{this.Name} {ScheduleInputCommandActions.Delete} [имя_команды] - Отменить циклическое выполнение запланированной команды.\n" +
+                $"{this.Name} {ScheduleInputCommandActions.Delete} [имя_команды] [время] - Отменить ежедневное выполнение запланированной команды, запланированное на указанное время.\n" +
+                $"{this.Name} {ScheduleInputCommandActions.DeleteAll} [имя_команды] - Отменить все запланированные задачи для указанной команды.\n" +
+                $"{this.Name} {ScheduleInputCommandActions.Help} - Показать это справочное сообщение.";
             await botClient.SendTextMessageAsync(chatId, helpMessage);
         }
 
@@ -78,23 +78,20 @@ namespace ArduinoTelegramBot.Commands.System
             {
                 switch (action)
                 {
-                    case ScheduleCommandActions.Interval:
-                        await HandleIntervalAsync(botClient, message, parameters);
+                    case ScheduleInputCommandActions.Interval:
+                        await HandleCycleAsync(botClient, message, parameters);
                         break;
-                    case ScheduleCommandActions.Daily:
+                    case ScheduleInputCommandActions.Daily:
                         await HandleDailyAsync(botClient, message, parameters);
                         break;
-                    case ScheduleCommandActions.DeleteInterval:
-                        await HandleDeleteIntervalAsync(botClient, message, parameters);
-                        break;
-                    case ScheduleCommandActions.DeleteDaily:
-                        await HandleDeleteDailyAsync(botClient, message, parameters);
-                        break;
-                    case ScheduleCommandActions.Delete:
+                    case ScheduleInputCommandActions.Delete:
                         await HandleDeleteAsync(botClient, message, parameters);
                         break;
+                    case ScheduleInputCommandActions.DeleteAll:
+                        await HandleDeleteAllAsync(botClient, message, parameters);
+                        break;
                     default:
-                        await botClient.SendTextMessageAsync(message.Chat.Id, $"Введен неверный аргумент, для вызова справки введите {this.Name} help");
+                        await botClient.SendTextMessageAsync(message.Chat.Id, $"Введен неверный аргумент, для вызова справки введите {this.Name} {ScheduleInputCommandActions.Help}");
                         break;
                 }
             }
@@ -104,11 +101,12 @@ namespace ArduinoTelegramBot.Commands.System
             }
             catch (Exception ex)
             {
-                // Логгирование ошибки
                 await botClient.SendTextMessageAsync(message.Chat.Id, "Произошла непредвиденная ошибка при выполнении команды.");
             }
         }
-        private async Task HandleIntervalAsync(ITelegramBotClient botClient, Message message, string[] parameters)
+
+
+        private async Task HandleCycleAsync(ITelegramBotClient botClient, Message message, string[] parameters)
         {
             if (parameters.Length != 2)
             {
@@ -129,7 +127,7 @@ namespace ArduinoTelegramBot.Commands.System
                 throw new ArgumentException("Неверный формат интервала.");
             }
 
-            var result = _schedulerService.ScheduleCommand(command, message.Chat.Id.ToString(), intervalTimeSpan);
+            var result = await _schedulerService.ScheduleCycleTaskAsync(command, message.Chat.Id, intervalTimeSpan);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 
@@ -154,11 +152,28 @@ namespace ArduinoTelegramBot.Commands.System
                 throw new ArgumentException("Неверный формат времени.");
             }
 
-            var result = _schedulerService.ScheduleDailyTask(command, message.Chat.Id.ToString(), dailyTimeSpan);
+            var result = await _schedulerService.ScheduleDailyTaskAsync(command, message.Chat.Id, dailyTimeSpan);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 
-        private async Task HandleDeleteIntervalAsync(ITelegramBotClient botClient, Message message, string[] parameters)
+        private async Task HandleDeleteAsync(ITelegramBotClient botClient, Message message, string[] parameters)
+        {
+            if (parameters.Length == 1)
+            {
+                // Удаление циклической задачи
+                await HandleDeleteCycleAsync(botClient, message, parameters);
+            }
+            else if (parameters.Length == 2)
+            {// Удаление ежедневной задачи на конкретное время
+                await HandleDeleteDailyAsync(botClient, message, parameters);
+            }
+            else
+            {
+                await botClient.SendTextMessageAsync(message.Chat.Id, $"Неверный формат команды. Используйте {this.Name} {ScheduleInputCommandActions.Help} для справки.");
+            }
+        }
+
+        private async Task HandleDeleteCycleAsync(ITelegramBotClient botClient, Message message, string[] parameters)
         {
             if (parameters.Length != 1)
             {
@@ -166,7 +181,7 @@ namespace ArduinoTelegramBot.Commands.System
             }
 
             var commandName = parameters[0];
-            var result = _schedulerService.CancelScheduledCommand(commandName, message.Chat.Id.ToString());//исправить эту ебанину, chatid имеет тип long, я хз почему перешел на string в какой-то момент, видимо, спутал с апи-токеном
+            var result = await _schedulerService.CancelScheduledCycleTaskAsync(commandName, message.Chat.Id);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 
@@ -184,11 +199,11 @@ namespace ArduinoTelegramBot.Commands.System
                 throw new ArgumentException("Неверный формат времени.");
             }
 
-            var result = _schedulerService.CancelScheduledDailyTask(commandName, message.Chat.Id.ToString(), timeToDelete);
+            var result = await _schedulerService.CancelScheduledDailyTaskAsync(commandName, message.Chat.Id, timeToDelete);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 
-        private async Task HandleDeleteAsync(ITelegramBotClient botClient, Message message, string[] parameters)
+        private async Task HandleDeleteAllAsync(ITelegramBotClient botClient, Message message, string[] parameters)
         {
             if (parameters.Length != 1)
             {
@@ -196,13 +211,14 @@ namespace ArduinoTelegramBot.Commands.System
             }
 
             var commandName = parameters[0];
-            var result = _schedulerService.CancelAllScheduledTasks(commandName, message.Chat.Id.ToString());
+            var result = await _schedulerService.CancelAllScheduledTasksAsync(commandName, message.Chat.Id);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 
         private async Task HandleGetScheduledTasksAsync(ITelegramBotClient botClient, long chatId)
         {
-            var scheduledTasks = _schedulerService.GetScheduledTasksForChat(chatId.ToString());
+            //получение списка задач должно быть асинхронным
+            var scheduledTasks = await _schedulerService.GetScheduledTasksForChatAsync(chatId);
 
             if (scheduledTasks.Count == 0)
             {

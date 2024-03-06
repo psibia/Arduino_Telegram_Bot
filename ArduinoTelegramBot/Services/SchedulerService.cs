@@ -5,7 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Telegram.Bot.Types;
 using Telegram.Bot;
 using Serilog;
-using ArduinoTelegramBot.Models;
+using ArduinoTelegramBot.Models.Sheduler;
 
 namespace ArduinoTelegramBot.Services
 {
@@ -20,19 +20,17 @@ namespace ArduinoTelegramBot.Services
         {
             _serviceProvider = serviceProvider;
             _permissionsDatabaseService = permissionsDatabaseService;
-            Log.Information("Планировщик задач: Сервис инициализирован");
             _commandFactory = commandFactory;
+            Log.Information("Планировщик задач: Сервис инициализирован");
         }
 
-        public ScheduleOperationResult ScheduleCommand(IAuthorizedCommand command, string chatId, TimeSpan interval, bool isStartupLoad = false, string taskId = null)
+        public async Task<ScheduleOperationResult> ScheduleCycleTaskAsync(IAuthorizedCommand command, long chatId, TimeSpan interval, bool isStartupLoad = false, string taskId = null)
         {
-            // Проверяем, не запланирована ли уже такая задача
             if (_timers.Any(t => t.Command.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId))
             {
-                return ScheduleOperationResult.Error($"Циклическое выполнение команды {command.Name} уже запланировано для чата {chatId}.");
+                return ScheduleOperationResult.Error($"Для команды {command.Name} уже запланировано выполнение задачи. Создание циклической задачи для этой команды невозможно.");
             }
 
-            // Создаем информацию о таймере для циклической команды
             taskId = taskId ?? Guid.NewGuid().ToString();
             var schedulerTimerInfo = new SchedulerTimerInfo
             {
@@ -43,12 +41,10 @@ namespace ArduinoTelegramBot.Services
                 DailyTime = null
             };
 
-            // Создаем и запускаем таймер
             var timer = new Timer(Callback, schedulerTimerInfo, interval, interval);
             schedulerTimerInfo.Timer = timer;
             _timers.Add(schedulerTimerInfo);
 
-            // Создаем данные о задаче для сохранения
             var taskData = new ScheduledTaskData
             {
                 TaskId = taskId,
@@ -58,35 +54,41 @@ namespace ArduinoTelegramBot.Services
                 DailyTime = null
             };
 
-            // Сохраняем задачу, если это не загрузка при старте программы
             if (!isStartupLoad)
             {
-                _permissionsDatabaseService.SaveScheduledTaskAsync(taskData).Wait();
+                await _permissionsDatabaseService.SaveScheduledTaskAsync(taskData);
             }
 
             Log.Information("Планировщик задач: Команда {CommandName} запланирована для чата {ChatId} с интервалом {Interval}", command.Name, chatId, interval);
             return ScheduleOperationResult.Ok($"Запланировано циклическое выполнение команды {command.Name} с интервалом {interval}.");
         }
 
-        public ScheduleOperationResult ScheduleDailyTask(IAuthorizedCommand command, string chatId, TimeSpan dailyTime, bool isStartupLoad = false, string taskId = null)
+        public async Task<ScheduleOperationResult> ScheduleDailyTaskAsync(IAuthorizedCommand command, long chatId, TimeSpan dailyTime, bool isStartupLoad = false, string taskId = null)
         {
-            if (_timers.Any(t => t.Command.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId && t.DailyTime == dailyTime))
+            if (_timers.Any(t => t.Command.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId && t.DailyTime == null))
             {
-                return ScheduleOperationResult.Error($"Ежедневная задача {command.Name} уже запланирована для чата {chatId} на {dailyTime}.");
+                Log.Information("Планировщик задач: Попытка создать ежедневную задачу для чата {id}. Для команды {name} уже запланировано циклическое выполнение задачи.", chatId, command.Name);
+                return ScheduleOperationResult.Error($"Для команды {command.Name} уже запланировано циклическое выполнение задачи. Невозможно создать ежедневную задачу.");
             }
 
-            var now = DateTime.Now;
-            var firstRunTime = now.TimeOfDay > dailyTime ? now.AddDays(1).Add(dailyTime) : now.Date.Add(dailyTime);
-            var initialDelay = firstRunTime - now;
+            if (_timers.Any(t => t.Command.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId && t.DailyTime == dailyTime))
+            {
+                Log.Information("Планировщик задач: Ежедневная задача {name} уже запланирована на {dailyTime}.", chatId, command.Name, dailyTime);
+                return ScheduleOperationResult.Error($"Ежедневная задача {command.Name} уже запланирована на {dailyTime}.");
+            }
 
             taskId = taskId ?? Guid.NewGuid().ToString();
+            var now = DateTime.Now;
+            var firstRunTime = now.TimeOfDay > dailyTime ? now.AddDays(1).Date.Add(dailyTime) : now.Date.Add(dailyTime);
+            var initialDelay = firstRunTime - now;
+
             var schedulerTimerInfo = new SchedulerTimerInfo
             {
                 TaskId = taskId,
                 Command = command,
                 ChatId = chatId,
                 DailyTime = dailyTime,
-                Interval = TimeSpan.FromDays(1) // Установлен для обозначения повторения задачи каждые 24 часа
+                Interval = TimeSpan.FromDays(1)
             };
 
             var timer = new Timer(Callback, schedulerTimerInfo, initialDelay, TimeSpan.FromDays(1));
@@ -99,23 +101,21 @@ namespace ArduinoTelegramBot.Services
                 CommandName = command.Name,
                 ChatId = chatId,
                 DailyTime = dailyTime,
-                Interval = TimeSpan.FromDays(1) //может быть использовано для уточнения, так как задача ежедневная
+                Interval = TimeSpan.FromDays(1)
             };
 
-            if (!isStartupLoad) // Чтобы задача не дублировалась при запуске программы, когда загружаются имеющиеся задачи
+            if (!isStartupLoad)
             {
-                _permissionsDatabaseService.SaveScheduledTaskAsync(taskData).Wait();
+                await _permissionsDatabaseService.SaveScheduledTaskAsync(taskData);
             }
 
             Log.Information("Планировщик задач: Ежедневная задача {CommandName} запланирована для чата {ChatId} на {DailyTime}", command.Name, chatId, dailyTime);
             return ScheduleOperationResult.Ok($"Ежедневная задача {command.Name} успешно запланирована на {dailyTime}.");
         }
 
-        public ScheduleOperationResult CancelScheduledCommand(string commandName, string chatId)
+        public async Task<ScheduleOperationResult> CancelScheduledCycleTaskAsync(string commandName, long chatId)
         {
-            var taskIdsToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId)
-                                         .Select(t => t.TaskId)
-                                         .ToList();
+            var taskIdsToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId && t.DailyTime == null).Select(t => t.TaskId).ToList();
 
             if (!taskIdsToRemove.Any())
             {
@@ -129,65 +129,60 @@ namespace ArduinoTelegramBot.Services
                 {
                     timerInfo.Timer.Dispose();
                     _timers.Remove(timerInfo);
+                    await _permissionsDatabaseService.DeleteScheduledTaskAsync(taskId);
                     Log.Information("Планировщик задач: Отмена циклической задачи {CommandName} для chatId {ChatId}", commandName, chatId);
-                    _permissionsDatabaseService.DeleteScheduledTaskAsync(taskId).Wait();
                 }
             }
 
-            return ScheduleOperationResult.Ok($"Циклическое выполнение задачи {commandName} для chatId {chatId} успешно отменено.");
+            return ScheduleOperationResult.Ok($"Циклическое выполнение задачи {commandName} успешно отменено.");
         }
 
-        public ScheduleOperationResult CancelScheduledDailyTask(string commandName, string chatId, TimeSpan taskTime)
+        public async Task<ScheduleOperationResult> CancelScheduledDailyTaskAsync(string commandName, long chatId, TimeSpan taskTime)
         {
-            // Выборка задач для удаления учитывает как commandName, так и chatId для однозначной идентификации
-            var tasksToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase)
-                                                    && t.ChatId == chatId
-                                                    && t.DailyTime == taskTime).ToList();
+            var tasksToRemove = _timers.Where(t => t.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase) && t.ChatId == chatId && t.DailyTime == taskTime).ToList();
 
             if (!tasksToRemove.Any())
             {
-                return ScheduleOperationResult.Error($"Ежедневная задача {commandName} на {taskTime} не найдена для chatId {chatId}.");
+                return ScheduleOperationResult.Error($"Ежедневная задача {commandName} на {taskTime} не найдена.");
             }
 
             foreach (var timerInfo in tasksToRemove)
             {
                 timerInfo.Timer.Dispose();
                 _timers.Remove(timerInfo);
+                await _permissionsDatabaseService.DeleteScheduledTaskAsync(timerInfo.TaskId);
                 Log.Information("Планировщик задач: Отмена ежедневной задачи {CommandName} для chatId {ChatId} на {TaskTime}", commandName, chatId, taskTime);
-                // Для удаления используется TaskId, достаточный для однозначного определения задачи
-                _permissionsDatabaseService.DeleteScheduledTaskAsync(timerInfo.TaskId).Wait();
             }
 
-            return ScheduleOperationResult.Ok($"Ежедневная задача {commandName} на {taskTime} для chatId {chatId} успешно отменена.");
+            return ScheduleOperationResult.Ok($"Ежедневная задача {commandName} на {taskTime} успешно отменена.");
         }
 
-        public ScheduleOperationResult CancelAllScheduledTasks(string commandName, string chatId)
+
+        public async Task<ScheduleOperationResult> CancelAllScheduledTasksAsync(string commandName, long chatId)
         {
-            var taskIdsToRemove = _timers.Where(timerInfo => timerInfo.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase) && timerInfo.ChatId == chatId)
-                                         .Select(t => t.TaskId)
-                                         .ToList();
+            var taskIdsToRemove = _timers.Where(timerInfo => timerInfo.Command.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase) && timerInfo.ChatId == chatId).Select(t => t.TaskId).ToList();
 
             if (!taskIdsToRemove.Any())
             {
-                return ScheduleOperationResult.Error($"Команда {commandName} не найдена или для неё не запланированы задачи в чате {chatId}.");
+                return ScheduleOperationResult.Error($"Команда {commandName} не найдена или для неё не запланированы задачи.");
             }
 
             foreach (var taskId in taskIdsToRemove)
             {
-                var timerInfo = _timers.FirstOrDefault(t => t.TaskId == taskId && t.ChatId == chatId);
+                var timerInfo = _timers.FirstOrDefault(t => t.TaskId == taskId);
                 if (timerInfo != null)
                 {
                     timerInfo.Timer.Dispose();
                     _timers.Remove(timerInfo);
+                    await _permissionsDatabaseService.DeleteScheduledTaskAsync(taskId);
                     Log.Information("Планировщик задач: Полная отмена задач {CommandName} для chatId {ChatId}", commandName, chatId);
-                    _permissionsDatabaseService.DeleteScheduledTaskAsync(taskId).Wait();
                 }
             }
 
-            return ScheduleOperationResult.Ok($"Полная отмена задач для команды: {commandName} в чате {chatId}.");
+            return ScheduleOperationResult.Ok($"Выполнена полная отмена задач для команды: {commandName}.");
         }
 
-        public List<ScheduledTaskInfo> GetScheduledTasksForChat(string chatId)
+        public async Task<List<ScheduledTaskInfo>> GetScheduledTasksForChatAsync(long chatId)
         {
             var scheduledTasks = new List<ScheduledTaskInfo>();
 
@@ -203,7 +198,7 @@ namespace ArduinoTelegramBot.Services
                 scheduledTasks.Add(scheduledTaskInfo);
             }
 
-            return scheduledTasks;
+            return await Task.FromResult(scheduledTasks);
         }
 
 
@@ -213,7 +208,7 @@ namespace ArduinoTelegramBot.Services
             using (var scope = _serviceProvider.CreateScope())
             {
                 var botClient = scope.ServiceProvider.GetRequiredService<ITelegramBotClient>();
-                var message = new Message() { Chat = new Chat() { Id = long.Parse(timerInfo.ChatId) } };
+                var message = new Message() { Chat = new Chat() { Id = timerInfo.ChatId } };
                 try
                 {
                     timerInfo.Command.ExecuteAsync(botClient, message).Wait();
@@ -235,16 +230,13 @@ namespace ArduinoTelegramBot.Services
                 var command = _commandFactory.CreateCommand(taskData.CommandName);
                 if (command != null)
                 {
-                    // Проверяем, задано ли время выполнения для ежедневной задачи
                     if (taskData.DailyTime.HasValue)
                     {
-                        // Передаем isStartupLoad и TaskId в ScheduleDailyTask
-                        ScheduleDailyTask(command, taskData.ChatId, taskData.DailyTime.Value, true, taskData.TaskId);
+                        await ScheduleDailyTaskAsync(command, taskData.ChatId, taskData.DailyTime.Value, isStartupLoad: true, taskId: taskData.TaskId);
                     }
                     else
                     {
-                        // Передаем isStartupLoad и TaskId в ScheduleCommand для циклических задач
-                        ScheduleCommand(command, taskData.ChatId, taskData.Interval, true, taskData.TaskId);
+                        await ScheduleCycleTaskAsync(command, taskData.ChatId, taskData.Interval, isStartupLoad: true, taskId: taskData.TaskId);
                     }
                 }
                 else
