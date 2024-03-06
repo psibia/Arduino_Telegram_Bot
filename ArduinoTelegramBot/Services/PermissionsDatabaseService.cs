@@ -110,10 +110,10 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         await File.WriteAllTextAsync(_tasksFilePath, json);
     }
 
-    public async Task DeleteScheduledTaskAsync(string commandName, string chatId)
+    public async Task DeleteScheduledTaskAsync(string taskId)
     {
         List<ScheduledTaskData> tasks = await LoadScheduledTasksAsync();
-        var taskToRemove = tasks.FirstOrDefault(task => task.CommandName == commandName && task.ChatId == chatId);
+        var taskToRemove = tasks.FirstOrDefault(task => task.TaskId == taskId);
         if (taskToRemove != null)
         {
             tasks.Remove(taskToRemove);

@@ -184,7 +184,7 @@ namespace ArduinoTelegramBot.Commands.System
                 throw new ArgumentException("Неверный формат времени.");
             }
 
-            var result = _schedulerService.CancelScheduledDailyTask(commandName, timeToDelete);
+            var result = _schedulerService.CancelScheduledDailyTask(commandName, message.Chat.Id.ToString(), timeToDelete);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 
@@ -196,7 +196,7 @@ namespace ArduinoTelegramBot.Commands.System
             }
 
             var commandName = parameters[0];
-            var result = _schedulerService.CancelAllScheduledTasks(commandName);
+            var result = _schedulerService.CancelAllScheduledTasks(commandName, message.Chat.Id.ToString());
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 

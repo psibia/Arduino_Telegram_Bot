@@ -12,7 +12,7 @@ namespace ArduinoTelegramBot.Services.Interfaces
         Task<(string PortName, int BaudRate, Parity Parity, int DataBits, StopBits StopBits)> LoadSerialPortConfigAsync();
         Task SaveSerialPortConfigAsync(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits);
         Task SaveScheduledTaskAsync(ScheduledTaskData taskData);
-        Task DeleteScheduledTaskAsync(string chatId, string commandName);
+        Task DeleteScheduledTaskAsync(string taskId);
         Task<List<ScheduledTaskData>> LoadScheduledTasksAsync();
     }
 }

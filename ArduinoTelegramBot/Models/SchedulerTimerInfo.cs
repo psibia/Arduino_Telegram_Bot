@@ -9,6 +9,7 @@ namespace ArduinoTelegramBot.Models
 {
     public class SchedulerTimerInfo
     {
+        public string TaskId { get; set; } = Guid.NewGuid().ToString();
         public Timer Timer { get; set; }
         public string ChatId { get; set; }
         public IAuthorizedCommand Command { get; set; }
