@@ -33,7 +33,7 @@ public class CommandHandler : ICommandHandler
 
             if (command is IAuthorizedCommand authorizedCommand)
             {
-                var isAuthorized = await _authorizationService.IsAuthorized(message.Chat.Id, authorizedCommand.Name);
+                var isAuthorized = await _authorizationService.CheckUserAuthorization(message.Chat.Id, authorizedCommand.Name);
                 if (!isAuthorized)
                 {
                     var responseMessage = $"У вас недостаточно прав для выполнения команды {command.Name}.";

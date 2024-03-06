@@ -16,16 +16,45 @@ public class UserAuthorizationService : IUserAuthorizationService
     public UserAuthorizationService(IPermissionsDatabaseService permissionsDatabase)
     {
         _permissionsDatabase = permissionsDatabase;
-        Initialize();
+        InitializeAsync().ConfigureAwait(false);
     }
 
-    private async void Initialize()
+    public async Task<bool> CheckUserAuthorization(long userId, string commandName)
+    {
+        if (_userKeys.TryGetValue(userId, out var key) && NeedToRefreshPermissions(userId, key))
+        {
+            return await FetchAndCheckPermissionAsync(userId, key, commandName);
+        }
+        else if (_permissions.TryGetValue(key, out var cachedAccessKey))
+        {
+            return HasAccessToCommand(cachedAccessKey, commandName);
+        }
+        return false;
+    }
+
+    public async Task<AuthorizationResult> AttemptAuthorizationWithKey(string key, long userId)
     {
         try
         {
-            Log.Information("Сервис авторизации: Начинается загрузка данных авторизации пользователей");
+            await AuthorizeUserAsync(userId, key);
+            var message = "Вы успешно авторизованы.";
+            Log.Information($"Сервис авторизации: Пользователь {userId} успешно авторизован с ключом {key}");
+            return new AuthorizationResult { Success = true, Message = message };
+        }
+        catch (KeyNotFoundException)
+        {
+            var message = "Данный ключ не найден или неверен.";
+            Log.Warning($"Сервис авторизации: Пользователь {userId} пытался авторизоваться с неверным ключом {key}.");
+            return new AuthorizationResult { Success = false, Message = message };
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
+        try
+        {
             _userKeys = await _permissionsDatabase.LoadUserKeysAsync();
-            Log.Information("Сервис авторизации: Данные авторизации пользователей успешно загружены. Загружено {Count} записей", _userKeys.Count);
+            Log.Information($"Сервис авторизации: Данные авторизации пользователей успешно загружены. Загружено {_userKeys.Count} записей");
         }
         catch (Exception ex)
         {
@@ -33,74 +62,30 @@ public class UserAuthorizationService : IUserAuthorizationService
         }
     }
 
-    public async Task<bool> IsAuthorized(long userId, string commandName)
-    {
-        if (_userKeys.TryGetValue(userId, out var key) &&
-            (!_lastChecked.ContainsKey(userId) || DateTime.UtcNow.Subtract(_lastChecked[userId]).TotalMinutes > CacheDurationInMinutes || !_permissions.ContainsKey(key)))
-        {
-            try
-            {
-                var accessKey = await _permissionsDatabase.GetPermissionsAsync(key);
-                _lastChecked[userId] = DateTime.UtcNow;
-                _permissions[key] = accessKey; //обновляем кэшированный объект AccessKey для ключа
+    private bool NeedToRefreshPermissions(long userId, string key) => !_lastChecked.ContainsKey(userId) || DateTime.UtcNow.Subtract(_lastChecked[userId]).TotalMinutes > CacheDurationInMinutes || !_permissions.ContainsKey(key);
 
-                return accessKey.IsMasterKey || (accessKey.AvailableCommands?.Contains(commandName, StringComparer.InvariantCultureIgnoreCase) ?? false);
-            }
-            catch (KeyNotFoundException)
-            {
-                return false;
-            }
-        }
-        else
-        {
-            //если ключ находится в кэше и не истекло время кэширования, проверяем доступность команды
-            var cachedAccessKey = _permissions[key];
-            return cachedAccessKey.IsMasterKey || (cachedAccessKey.AvailableCommands?.Contains(commandName, StringComparer.InvariantCultureIgnoreCase) ?? false);
-        }
+    private async Task<bool> FetchAndCheckPermissionAsync(long userId, string key, string commandName)
+    {
+        var accessKey = await _permissionsDatabase.GetPermissionsAsync(key);
+        _lastChecked[userId] = DateTime.UtcNow;
+        _permissions[key] = accessKey;
+        return HasAccessToCommand(accessKey, commandName);
     }
 
-
-
-    public async Task AuthorizeUser(long userId, string key)
+    private bool HasAccessToCommand(AccessKey accessKey, string commandName)
     {
-        try
-        {
-            var accessKey = await _permissionsDatabase.GetPermissionsAsync(key);
-            if (accessKey != null)
-            {
-                _userKeys[userId] = key;
-                _lastChecked[userId] = DateTime.UtcNow;
-                _permissions[key] = accessKey; //Обновляем кэшированный объект AccessKey
-                await _permissionsDatabase.SaveUserKeysAsync(_userKeys); //сохраняем обновленные данные авторизации.
-            }
-        }
-        catch (KeyNotFoundException ex)
-        {
-            //Log.Warning(ex.Message);
-            throw; //logiruen na lvl vishe
-        }
+        return accessKey.IsMasterKey || (accessKey.AvailableCommands?.Contains(commandName, StringComparer.InvariantCultureIgnoreCase) ?? false);
     }
 
-    public bool IsUserAuthorized(long userId)
+    private async Task AuthorizeUserAsync(long userId, string key)
     {
-        return _userKeys.ContainsKey(userId) && _lastChecked.ContainsKey(userId) &&
-               DateTime.UtcNow.Subtract(_lastChecked[userId]).TotalMinutes <= CacheDurationInMinutes;
-    }
-
-    public async Task<AuthorizationResult> ProcessAuthorizationAttempt(string key, long userId)
-    {
-        try
+        var accessKey = await _permissionsDatabase.GetPermissionsAsync(key);
+        if (accessKey != null)
         {
-            await AuthorizeUser(userId, key);
-            var message = "Вы успешно авторизованы.";
-            Log.Information("Сервис авторизации: Пользователь {UserId} успешно авторизован с ключом {Key}", userId, key);
-            return new AuthorizationResult { Success = true, Message = message };
-        }
-        catch (KeyNotFoundException)
-        {
-            var message = "Данный ключ не найден или неверен.";
-            Log.Warning("Сервис авторизации: Пользователь {UserId} пытался авторизоваться с неверным ключом {Key}.", userId, key);
-            return new AuthorizationResult { Success = false, Message = message };
+            _userKeys[userId] = key;
+            _lastChecked[userId] = DateTime.UtcNow;
+            _permissions[key] = accessKey;
+            await _permissionsDatabase.SaveUserKeysAsync(_userKeys);
         }
     }
 }
