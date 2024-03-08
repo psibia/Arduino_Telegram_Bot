@@ -4,6 +4,7 @@ using ArduinoTelegramBot.Services.Interfaces;
 using Serilog;
 using System.Collections.ObjectModel;
 using System.IO.Ports;
+using System.Text;
 using Telegram.Bot.Types;
 
 namespace ArduinoTelegramBot.Services
@@ -106,33 +107,49 @@ namespace ArduinoTelegramBot.Services
         public void ActivateDataReceiving(Action<string, long> onDataReceived)
         {
             _onDataReceived = onDataReceived;
+            StringBuilder buffer = new StringBuilder(); //буфер для накопления данных
+
             _serialPort.DataReceived += (sender, e) =>
             {
                 string data = _serialPort.ReadExisting();
-                Log.Information("Сервис последовательного порта: получены данные из {serial}: {data}", _serialPort.PortName, data);
-                string[] parts = data.Split(new[] { ':' }, 3);
-                if (parts.Length < 3) return; //ндостаточно данных для обработки
+                buffer.Append(data); //добавляем считанные данные в буфер
 
-                string type = parts[0];
-                string identifier = parts[1];
-                string content = parts[2];
+                //проверяем, содержит ли буфер полное сообщение (оканчивающееся на \n)
+                string bufferContent = buffer.ToString();
+                int newLineIndex = bufferContent.IndexOf('\n');
+                while (newLineIndex != -1) // ,  нашли конец строки
+                {
+                    string message = bufferContent.Substring(0, newLineIndex).Trim(); //извлекаем сообщение до \n
+                    Log.Information("Сервис последовательного порта: получены данные из {serial}: {data}", _serialPort.PortName, message);
 
-                if (type == "RES" && _requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
-                {
-                    //обработка респонса
-                    _onDataReceived?.Invoke(content, chatId);
-                    _requestGuidToChatIdMap.Remove(identifier);
-                }
-                else if (type == "NOT")
-                {
-                    //обработка уведомлений
-                    if (_subscriptions.ContainsKey(identifier))
+                    string[] parts = message.Split(new[] { ':' }, 3);
+                    if (parts.Length >= 3) // Достаточно данных для обработки
                     {
-                        foreach (var subscribedChatId in _subscriptions[identifier])
+                        string type = parts[0];
+                        string identifier = parts[1];
+                        string content = parts[2];
+
+                        if (type == "RES" && _requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
                         {
-                            _onDataReceived?.Invoke(content, subscribedChatId);
+                            _onDataReceived?.Invoke(content, chatId);
+                            _requestGuidToChatIdMap.Remove(identifier);
+                        }
+                        else if (type == "NOT")
+                        {
+                            if (_subscriptions.ContainsKey(identifier))
+                            {
+                                foreach (var subscribedChatId in _subscriptions[identifier])
+                                {
+                                    _onDataReceived?.Invoke(content, subscribedChatId);
+                                }
+                            }
                         }
                     }
+
+                    // Удаляем обработанное сообщение из буфера
+                    buffer.Remove(0, newLineIndex + 1);
+                    bufferContent = buffer.ToString();
+                    newLineIndex = bufferContent.IndexOf('\n');
                 }
             };
         }
