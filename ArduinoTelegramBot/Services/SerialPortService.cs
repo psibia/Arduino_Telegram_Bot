@@ -107,32 +107,41 @@ namespace ArduinoTelegramBot.Services
         public void ActivateDataReceiving(Action<string, long> onDataReceived)
         {
             _onDataReceived = onDataReceived;
-            StringBuilder buffer = new StringBuilder(); //буфер для накопления данных
+            StringBuilder buffer = new StringBuilder(); // Буфер для накопления данных
 
             _serialPort.DataReceived += (sender, e) =>
             {
                 string data = _serialPort.ReadExisting();
-                buffer.Append(data); //добавляем считанные данные в буфер
+                buffer.Append(data);
 
-                //проверяем, содержит ли буфер полное сообщение (оканчивающееся на \n)
                 string bufferContent = buffer.ToString();
                 int newLineIndex = bufferContent.IndexOf('\n');
-                while (newLineIndex != -1) // ,  нашли конец строки
+                while (newLineIndex != -1)
                 {
-                    string message = bufferContent.Substring(0, newLineIndex).Trim(); //извлекаем сообщение до \n
-                    Log.Information("Сервис последовательного порта: получены данные из {serial}: {data}", _serialPort.PortName, message);
-
+                    string message = bufferContent.Substring(0, newLineIndex).Trim();
                     string[] parts = message.Split(new[] { ':' }, 3);
-                    if (parts.Length >= 3) // Достаточно данных для обработки
+                    if (parts.Length >= 3)
                     {
                         string type = parts[0];
                         string identifier = parts[1];
                         string content = parts[2];
 
-                        if (type == "RES" && _requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
+                        if (type == "RES")
                         {
-                            _onDataReceived?.Invoke(content, chatId);
-                            _requestGuidToChatIdMap.Remove(identifier);
+                            if (_requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
+                            {
+                                _onDataReceived?.Invoke(content, chatId);
+                                _requestGuidToChatIdMap.Remove(identifier);
+                            }
+                        }
+                        else if (type == "ERR")
+                        {
+                            if (_requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
+                            {
+                                Log.Error("Сервис последовательного порта: Ошибка на устройстве, подключенном к {PortName}. Код ошибки: {ErrorCode}", _serialPort.PortName, content);
+                                _onDataReceived?.Invoke("Error: " + DescribeErrorCode(content), chatId);
+                                _requestGuidToChatIdMap.Remove(identifier);
+                            }
                         }
                         else if (type == "NOT")
                         {
@@ -144,12 +153,15 @@ namespace ArduinoTelegramBot.Services
                                 }
                             }
                         }
-                    }
 
-                    // Удаляем обработанное сообщение из буфера
-                    buffer.Remove(0, newLineIndex + 1);
-                    bufferContent = buffer.ToString();
-                    newLineIndex = bufferContent.IndexOf('\n');
+                        buffer.Remove(0, newLineIndex + 1);
+                        bufferContent = buffer.ToString();
+                        newLineIndex = bufferContent.IndexOf('\n');
+                    }
+                    else
+                    {
+                        break; //если строка не содержит достаточно частей, прерываем обработку
+                    }
                 }
             };
         }
@@ -233,6 +245,17 @@ namespace ArduinoTelegramBot.Services
                 Log.Error(ex, $"Сервис последовательного порта: Ошибка при открытии SerialPort: {ex.Message}");
                 return SerialPortOperationResult.Error($"Ошибка при открытии порта: {ex.Message}");
             }
+        }
+
+        private string DescribeErrorCode(string errorCode)
+        {
+            return errorCode switch
+            {
+                "001" => "Не удалось обработать переданные данные",
+                "002" => "Описание ошибки с кодом 002",
+                
+                _ => "Неизвестный код ошибки"
+            };
         }
     }
 }

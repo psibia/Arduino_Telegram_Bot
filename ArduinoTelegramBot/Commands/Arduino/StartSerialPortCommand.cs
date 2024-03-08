@@ -76,7 +76,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
                 // Активация приёма данных
                 _serialPortService.ActivateDataReceiving(async (data, chatId) =>
                 {
-                    await _dataHandler.HandleReceivedDataAsync(data, message.Chat.Id);
+                    await _dataHandler.HandleReceivedDataAsync(data, chatId);
                 });
             }
         }
