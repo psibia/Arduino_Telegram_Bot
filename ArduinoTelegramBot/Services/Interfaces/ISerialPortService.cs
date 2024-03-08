@@ -11,8 +11,8 @@ namespace ArduinoTelegramBot.Services.Interfaces
         Task<SerialPortOperationResult> SendDataAsync(string data, long chatId);
         void ActivateDataReceiving(Action<string, long> onDataReceived);
         SerialPort CurrentSerialPort();
-
-        Task<SerialPortOperationResult> Subscribe(long chatId);
-        Task<SerialPortOperationResult> Unsubscribe(long chatId);
+        Task<List<string>> GetUserSubscriptionsAsync(long chatId);
+        Task<SerialPortOperationResult> Subscribe(long chatId, string command);
+        Task<SerialPortOperationResult> Unsubscribe(long chatId, string command);
     }
 }

@@ -2,6 +2,7 @@
 using ArduinoTelegramBot.Models;
 using ArduinoTelegramBot.Services.Interfaces;
 using Serilog;
+using System.Collections.ObjectModel;
 using System.IO.Ports;
 using Telegram.Bot.Types;
 
@@ -13,9 +14,14 @@ namespace ArduinoTelegramBot.Services
         private Action<string, long> _onDataReceived;
         private ISerialDataHandler _dataHandler;
         private readonly Dictionary<string, long> _requestGuidToChatIdMap = new();
-        private readonly HashSet<long> _subscribedChatIds = new HashSet<long>();
+        private readonly Dictionary<string, HashSet<long>> _subscriptions = new Dictionary<string, HashSet<long>>();
+        private IPermissionsDatabaseService _permissionsDatabaseService;
 
-
+        public SerialPortService(IPermissionsDatabaseService permissionsDatabaseService)
+        {
+            _permissionsDatabaseService = permissionsDatabaseService;
+            _subscriptions = _permissionsDatabaseService.LoadSubscriptionsAsync().Result;
+        }
         public SerialPort CurrentSerialPort() => _serialPort;
 
         public async Task<SerialPortOperationResult> InitializeAndOpenAsync(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits)
@@ -40,37 +46,61 @@ namespace ArduinoTelegramBot.Services
             _serialPort.Parity = parity;
             _serialPort.DataBits = dataBits;
             _serialPort.StopBits = stopBits;
-            Log.Information($"Сервис последовательного порта: SerialPort инициализирован: {portName}, {baudRate}, {parity.ToString()}, {dataBits}, {stopBits.ToString()}");
-
+            Log.Information("Сервис последовательного порта: SerialPort инициализирован: {portName}, {baudRate}, {parity}, {dataBits}, {stopBits}", portName, baudRate, parity, dataBits, stopBits);
             return await TryOpenPortAsync();
         }
 
-        public async Task<SerialPortOperationResult> Subscribe(long chatId)
+        public async Task<SerialPortOperationResult> Subscribe(long chatId, string command)
         {
-            bool added = _subscribedChatIds.Add(chatId);
+            if (!_subscriptions.ContainsKey(command))
+            {
+                _subscriptions[command] = new HashSet<long>();
+            }
+
+            bool added = _subscriptions[command].Add(chatId);
             if (added)
             {
-                Log.Information($"ChatId {chatId} подписался на уведомления.");
-                return SerialPortOperationResult.Ok($"ChatId {chatId} успешно подписался на уведомления.");
+                await _permissionsDatabaseService.SaveSubscriptionsAsync(_subscriptions);
+                Log.Information("Сервис последовательного порта: ChatId {chatId} подписался на уведомления {command}.", chatId, command);
+                return SerialPortOperationResult.Ok($"Вы успешно подписались на уведомления с идентификатором {command}.");
             }
             else
             {
-                return SerialPortOperationResult.Error($"ChatId {chatId} уже подписан на уведомления.");
+                return SerialPortOperationResult.Error($"Вы уже подписаны на уведомления с идентификатором {command}.");
             }
         }
 
-        public async Task<SerialPortOperationResult> Unsubscribe(long chatId)
+        public async Task<SerialPortOperationResult> Unsubscribe(long chatId, string command)
         {
-            bool removed = _subscribedChatIds.Remove(chatId);
-            if (removed)
+            if (_subscriptions.ContainsKey(command) && _subscriptions[command].Remove(chatId))
             {
-                Log.Information($"ChatId {chatId} отписался от уведомлений.");
-                return SerialPortOperationResult.Ok($"ChatId {chatId} успешно отписался от уведомлений.");
+                if (_subscriptions[command].Count == 0)
+                {
+                    _subscriptions.Remove(command);
+                }
+                await _permissionsDatabaseService.SaveSubscriptionsAsync(_subscriptions);
+                Log.Information("Сервис последовательного порта: ChatId {chatId} отписался от уведомлений {command}", chatId, command);
+                return SerialPortOperationResult.Ok($"Вы успешно отписались от уведомлений с идентификатором {command}.");
             }
             else
             {
-                return SerialPortOperationResult.Error($"ChatId {chatId} не найден среди подписчиков.");
+                return SerialPortOperationResult.Error($"Вы не подписаны на уведомления с идентификатором {command}.");
             }
+        }
+
+        public async Task<List<string>> GetUserSubscriptionsAsync(long chatId)
+        {
+            List<string> userSubscriptions = new List<string>();
+
+            foreach (var subscription in _subscriptions)
+            {
+                if (subscription.Value.Contains(chatId))
+                {
+                    userSubscriptions.Add(subscription.Key);
+                }
+            }
+
+            return userSubscriptions;
         }
 
         public void ActivateDataReceiving(Action<string, long> onDataReceived)
@@ -79,18 +109,29 @@ namespace ArduinoTelegramBot.Services
             _serialPort.DataReceived += (sender, e) =>
             {
                 string data = _serialPort.ReadExisting();
-                string guid = ExtractGuid(data);
-                if (!string.IsNullOrEmpty(guid) && _requestGuidToChatIdMap.TryGetValue(guid, out long chatId))
+                Log.Information("Сервис последовательного порта: получены данные из {serial}: {data}", _serialPort.PortName, data);
+                string[] parts = data.Split(new[] { ':' }, 3);
+                if (parts.Length < 3) return; //ндостаточно данных для обработки
+
+                string type = parts[0];
+                string identifier = parts[1];
+                string content = parts[2];
+
+                if (type == "RES" && _requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
                 {
-                    string actualData = data.Substring(guid.Length + 1); //удаляем GUID и двоеточие из данных
-                    _onDataReceived?.Invoke(actualData, chatId);
-                    _requestGuidToChatIdMap.Remove(guid);
+                    //обработка респонса
+                    _onDataReceived?.Invoke(content, chatId);
+                    _requestGuidToChatIdMap.Remove(identifier);
                 }
-                else if (guid == null) //если gui нет, то это уведомление, которое отправляем всем подписчикам
+                else if (type == "NOT")
                 {
-                    foreach (var subscribedChatId in _subscribedChatIds)
+                    //обработка уведомлений
+                    if (_subscriptions.ContainsKey(identifier))
                     {
-                        _onDataReceived?.Invoke(data, subscribedChatId);
+                        foreach (var subscribedChatId in _subscriptions[identifier])
+                        {
+                            _onDataReceived?.Invoke(content, subscribedChatId);
+                        }
                     }
                 }
             };
@@ -134,11 +175,12 @@ namespace ArduinoTelegramBot.Services
                 string guid = Guid.NewGuid().ToString();
                 _requestGuidToChatIdMap[guid] = chatId;
 
-                string dataWithGuid = $"{guid}:{data}";
+                //форматирование данных с префиксом "REQ" для всех реквестов в сириал порт
+                string dataWithGuidAndType = $"REQ:{guid}:{data}";
                 if (_serialPort.IsOpen)
                 {
-                    _serialPort.Write(dataWithGuid);
-                    Log.Information($"Данные с GUID отправлены: {dataWithGuid}");
+                    _serialPort.Write(dataWithGuidAndType);
+                    Log.Information("Сервис последовательного порта: Данные отправлены: {dataWithGuidAndType}", dataWithGuidAndType);
                     return SerialPortOperationResult.Ok("Данные отправлены.");
                 }
                 else
@@ -148,7 +190,7 @@ namespace ArduinoTelegramBot.Services
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Ошибка при отправке данных: {Message}", ex.Message);
+                Log.Error(ex, "Сервис последовательного порта: Ошибка при отправке данных: {Message}", ex.Message);
                 return SerialPortOperationResult.Error($"Ошибка при отправке данных: {ex.Message}");
             }
         }
@@ -174,16 +216,6 @@ namespace ArduinoTelegramBot.Services
                 Log.Error(ex, $"Сервис последовательного порта: Ошибка при открытии SerialPort: {ex.Message}");
                 return SerialPortOperationResult.Error($"Ошибка при открытии порта: {ex.Message}");
             }
-        }
-
-        private string ExtractGuid(string data)
-        {
-            int colonIndex = data.IndexOf(':');
-            if (colonIndex > 0)
-            {
-                return data.Substring(0, colonIndex);
-            }
-            return null; // или throw new Exception("GUID не найден"), в зависимости от предпочтений обработки ошибок. Пока и такй сойдет на время тестов
         }
     }
 }

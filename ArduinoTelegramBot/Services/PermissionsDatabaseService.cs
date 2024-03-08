@@ -77,6 +77,52 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         return default;
     }
 
+
+
+    private readonly string _filePath = "subscriptions.json";
+    public async Task<Dictionary<string, HashSet<long>>> LoadSubscriptionsAsync()
+    {
+        try
+        {
+            if (File.Exists(_filePath))
+            {
+                string json = await File.ReadAllTextAsync(_filePath);
+                var subscriptions = JsonConvert.DeserializeObject<Dictionary<string, HashSet<long>>>(json);
+                Log.Information("База данных: Подписки успешно загружены из файла.");
+                return subscriptions ?? new Dictionary<string, HashSet<long>>();
+            }
+            else
+            {
+                Log.Information("База данных: Файл подписок не найден. Создается новый список подписок.");
+                return new Dictionary<string, HashSet<long>>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "База данных: Ошибка при загрузке подписок из файла.");
+            throw; // Перебрасываем исключение, если обработка на уровне выше предполагается
+        }
+    }
+    public async Task SaveSubscriptionsAsync(Dictionary<string, HashSet<long>> subscriptions)
+    {
+        try
+        {
+            string json = JsonConvert.SerializeObject(subscriptions, Formatting.Indented);
+            await File.WriteAllTextAsync(_filePath, json);
+            Log.Information("База данных: Подписки успешно сохранены в файл.");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "База данных: Ошибка при сохранении подписок в файл.");
+            throw; // Перебрасываем исключение, если обработка на уровне выше предполагается
+        }
+    }
+
+
+
+
+
+
     public async Task SaveSerialPortConfigAsync(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits)
     {
         var config = new

@@ -47,10 +47,11 @@ class Program
 
         services.AddSingleton<ITelegramBotClient>(provider => new TelegramBotClient("7115970409:AAG9nm3Rh5w-4mFVSKiTynyFOmjfCKNBj_o"));
         services.AddSingleton<IUserAuthorizationService, UserAuthorizationService>();
-        services.AddSingleton<ISerialPortService, SerialPortService>();
-        services.AddSingleton<ISerialDataHandler, SerialDataHandler>();
+        
         services.AddSingleton<ICommandHandler, CommandHandler>();
         services.AddSingleton<IPermissionsDatabaseService, PermissionsDatabaseService>();
+        services.AddSingleton<ISerialPortService, SerialPortService>();
+        services.AddSingleton<ISerialDataHandler, SerialDataHandler>();
         services.AddSingleton<ISchedulerService, SchedulerService>();
         services.AddTransient<ICommandFactory, CommandFactory>();
 
@@ -70,6 +71,8 @@ class Program
         services.AddTransient<IAuthorizedCommand>(serviceProvider => CloseSerialPortCommand.Create(serviceProvider, "/close_serial"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => ScheduleCommand.Create(serviceProvider, "/shedule"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => NotificationSubscriberCommand.Create(serviceProvider, "/subscribe"));
+        services.AddTransient<IAuthorizedCommand>(serviceProvider => NotificationUnsubscriberCommand.Create(serviceProvider, "/unsubscribe"));
+        services.AddTransient<IAuthorizedCommand>(serviceProvider => ShowSubscriptionsCommand.Create(serviceProvider, "/subscribe_get"));
         #endregion
         #region обработчики полученных данных с ардуинки (процессоры)
         services.AddTransient<ISerialDataProcessor, TemperatureDataProcessor>();

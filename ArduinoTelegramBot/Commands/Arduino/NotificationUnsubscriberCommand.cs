@@ -11,14 +11,14 @@ using Telegram.Bot;
 
 namespace ArduinoTelegramBot.Commands.Arduino
 {
-    public class NotificationSubscriberCommand : IAuthorizedCommand
+    public class NotificationUnsubscriberCommand : IAuthorizedCommand
     {
         private readonly ITelegramBotClient _botClient;
         private readonly ISerialPortService _serialPortService;
 
         public string Name { get; set; }
 
-        public NotificationSubscriberCommand(ITelegramBotClient botClient, ISerialPortService serialPortService)
+        public NotificationUnsubscriberCommand(ITelegramBotClient botClient, ISerialPortService serialPortService)
         {
             _botClient = botClient;
             _serialPortService = serialPortService;
@@ -27,21 +27,21 @@ namespace ArduinoTelegramBot.Commands.Arduino
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
         {
             // Извлекаем название команды из текста сообщения
-            string commandToSubscribe = message.Text.Substring(Name.Length).Trim();
+            string commandToUnsubscribe = message.Text.Substring(Name.Length).Trim();
 
-            if (string.IsNullOrEmpty(commandToSubscribe))
+            if (string.IsNullOrEmpty(commandToUnsubscribe))
             {
-                await botClient.SendTextMessageAsync(message.Chat.Id, "Пожалуйста, укажите название команды для подписки после имени команды.");
+                await botClient.SendTextMessageAsync(message.Chat.Id, "Пожалуйста, укажите название команды для отписки после имени команды.");
                 return;
             }
 
-            var result = await _serialPortService.Subscribe(message.Chat.Id, commandToSubscribe);
+            var result = await _serialPortService.Unsubscribe(message.Chat.Id, commandToUnsubscribe);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
 
-        public static NotificationSubscriberCommand Create(IServiceProvider serviceProvider, string name)
+        public static NotificationUnsubscriberCommand Create(IServiceProvider serviceProvider, string name)
         {
-            return new NotificationSubscriberCommand(
+            return new NotificationUnsubscriberCommand(
                 serviceProvider.GetRequiredService<ITelegramBotClient>(),
                 serviceProvider.GetRequiredService<ISerialPortService>())
             {
