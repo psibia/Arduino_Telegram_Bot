@@ -6,30 +6,33 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot;
 
 namespace ArduinoTelegramBot.Commands.Arduino
 {
-    public class OpenSerialPortCommand : IAuthorizedCommand
+    public class NotificationSubscriberCommand : IAuthorizedCommand
     {
         private readonly ITelegramBotClient _botClient;
         private readonly ISerialPortService _serialPortService;
+
         public string Name { get; set; }
 
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
         {
-            var result = await _serialPortService.TryOpenPortAsync();
+            var result = await _serialPortService.Subscribe(message.Chat.Id);
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
         }
-        public OpenSerialPortCommand(ITelegramBotClient botClient, ISerialPortService serialPortService)
+
+        public NotificationSubscriberCommand(ITelegramBotClient botClient, ISerialPortService serialPortService)
         {
             _botClient = botClient;
             _serialPortService = serialPortService;
         }
-        public static OpenSerialPortCommand Create(IServiceProvider serviceProvider, string name)
+
+        public static NotificationSubscriberCommand Create(IServiceProvider serviceProvider, string name)
         {
-            return new OpenSerialPortCommand(
+            return new NotificationSubscriberCommand(
                 serviceProvider.GetRequiredService<ITelegramBotClient>(),
                 serviceProvider.GetRequiredService<ISerialPortService>())
             {

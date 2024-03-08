@@ -75,7 +75,7 @@ public class CommandHandler : ICommandHandler
 
     private async Task HandleDefaultCommandAsync(ITelegramBotClient botClient, Message message)
     {
-        var defaultCommand = _serviceProvider.GetRequiredService<DefaultCommand>();
+        var defaultCommand = _serviceProvider.GetServices<ICommand>().OfType<DefaultCommand>().FirstOrDefault();
         if (defaultCommand != null)
         {
             await defaultCommand.ExecuteAsync(botClient, message);

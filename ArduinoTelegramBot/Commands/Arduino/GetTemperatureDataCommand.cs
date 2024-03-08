@@ -30,7 +30,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
 
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
         {
-            var result = await _serialPortService.SendDataAsync("temperature");
+            var result = await _serialPortService.SendDataAsync("temperature", message.Chat.Id);
             if (result.Success)
             {
                 //await botClient.SendTextMessageAsync(message.Chat.Id, "Данные успешно отправлены в SerialPort.");

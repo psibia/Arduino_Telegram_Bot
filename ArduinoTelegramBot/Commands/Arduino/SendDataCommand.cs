@@ -30,23 +30,23 @@ namespace ArduinoTelegramBot.Commands.Arduino
 
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
         {
-            //мзвлекаем данные для отправки из сообщения
             var dataToSend = message.Text.Substring(Name.Length).Trim();
+            long chatId = message.Chat.Id;
 
             if (string.IsNullOrEmpty(dataToSend))
             {
-                await botClient.SendTextMessageAsync(message.Chat.Id, "Пожалуйста, укажите данные для отправки после команды /serial.");
+                await botClient.SendTextMessageAsync(chatId, "Пожалуйста, укажите данные для отправки после команды.");
                 return;
             }
 
-            var result = await _serialPortService.SendDataAsync(dataToSend);
+            var result = await _serialPortService.SendDataAsync(dataToSend, chatId);
             if (result.Success)
             {
-                //await botClient.SendTextMessageAsync(message.Chat.Id, "Данные успешно отправлены в SerialPort.");
+                await botClient.SendTextMessageAsync(chatId, "Запрос отправлен."); //удалить, это для тестирования
             }
             else
             {
-                await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
+                await botClient.SendTextMessageAsync(chatId, result.Message);
             }
         }
     }
