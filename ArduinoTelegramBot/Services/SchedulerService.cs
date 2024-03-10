@@ -45,7 +45,7 @@ namespace ArduinoTelegramBot.Services
             schedulerTimerInfo.Timer = timer;
             _timers.Add(schedulerTimerInfo);
 
-            var taskData = new ScheduledTaskData
+            var taskData = new ScheduledLoadFromDBTaskInfo
             {
                 TaskId = taskId,
                 CommandName = command.Name,
@@ -95,7 +95,7 @@ namespace ArduinoTelegramBot.Services
             schedulerTimerInfo.Timer = timer;
             _timers.Add(schedulerTimerInfo);
 
-            var taskData = new ScheduledTaskData
+            var taskData = new ScheduledLoadFromDBTaskInfo
             {
                 TaskId = taskId,
                 CommandName = command.Name,

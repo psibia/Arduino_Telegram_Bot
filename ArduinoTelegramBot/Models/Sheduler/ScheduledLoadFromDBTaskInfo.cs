@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ArduinoTelegramBot.Models.Sheduler
 {
-    public class ScheduledTaskData
+    public class ScheduledLoadFromDBTaskInfo
     {
         public string TaskId { get; set; } = Guid.NewGuid().ToString();
         public string CommandName { get; set; }

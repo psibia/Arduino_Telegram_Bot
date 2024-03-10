@@ -6,11 +6,11 @@ namespace ArduinoTelegramBot.Commands.Demonstration;
 
 public class AdminCommand : IAuthorizedCommand
 {
-    public string Name { get; set; } = "/упс";
+    public string Name { get; set; }
 
     public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
     {
-        await botClient.SendTextMessageAsync(message.Chat.Id, "Это админская команда");
+        await botClient.SendTextMessageAsync(message.Chat.Id, "Я админ, сын Сергея");
     }
 
     public static AdminCommand Create(string name)

@@ -8,7 +8,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
 {
     public class GetTemperatureDataCommand : IAuthorizedCommand
     {
-        public string Name { get; set; } = "/упс";
+        public string Name { get; set; }
         private readonly ITelegramBotClient _botClient;
         private readonly ISerialPortService _serialPortService;
 

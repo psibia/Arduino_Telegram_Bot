@@ -7,11 +7,11 @@ namespace ArduinoTelegramBot.Services;
 
 public class UserAuthorizationService : IUserAuthorizationService
 {
-    private ConcurrentDictionary<long, string> _userKeys = new ConcurrentDictionary<long, string>();
-    private ConcurrentDictionary<long, DateTime> _lastChecked = new ConcurrentDictionary<long, DateTime>();
-    private static readonly ConcurrentDictionary<string, AccessKey> _permissions = new ConcurrentDictionary<string, AccessKey>();
-    private const int CacheDurationInMinutes = 1;
-    private readonly IPermissionsDatabaseService _permissionsDatabase;
+    private ConcurrentDictionary<long, string> _userKeys = new ConcurrentDictionary<long, string>();//соответствие chatid и токена
+    private ConcurrentDictionary<long, DateTime> _lastChecked = new ConcurrentDictionary<long, DateTime>();//время последней авторизации для пользователя chatid
+    private static readonly ConcurrentDictionary<string, AccessKey> _permissions = new ConcurrentDictionary<string, AccessKey>();//права доступа для токена
+    private const int CacheDurationInMinutes = 1;//время хранения авторизационных данных в кэше без повторного обращения к БД
+    private readonly IPermissionsDatabaseService _permissionsDatabase;//базоимитатор
 
     public UserAuthorizationService(IPermissionsDatabaseService permissionsDatabase)
     {

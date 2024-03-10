@@ -14,8 +14,8 @@ namespace ArduinoTelegramBot.Services.Interfaces
         Task SaveSerialPortConfigAsync(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits);
         Task SaveSubscriptionsAsync(Dictionary<string, HashSet<long>> subscriptions);
         Task<Dictionary<string, HashSet<long>>> LoadSubscriptionsAsync();
-        Task SaveScheduledTaskAsync(ScheduledTaskData taskData);
+        Task SaveScheduledTaskAsync(ScheduledLoadFromDBTaskInfo taskData);
         Task DeleteScheduledTaskAsync(string taskId);//для единообразности можно передавать объект ScheduledTaskData, но и так сойдет
-        Task<List<ScheduledTaskData>> LoadScheduledTasksAsync();
+        Task<List<ScheduledLoadFromDBTaskInfo>> LoadScheduledTasksAsync();
     }
 }

@@ -45,7 +45,7 @@ class Program
     {
         Log.Debug("Program: Настройка сервисов");
 
-        services.AddSingleton<ITelegramBotClient>(provider => new TelegramBotClient("7115970409:AAG9nm3Rh5w-4mFVSKiTynyFOmjfCKNBj_o"));
+        services.AddSingleton<ITelegramBotClient>(provider => new TelegramBotClient("7115970409:AAFBIPevz5fhaHD-BNskOJJZoMUWbckV5SQ"));
         services.AddSingleton<IUserAuthorizationService, UserAuthorizationService>();
         
         services.AddSingleton<ICommandHandler, CommandHandler>();
@@ -73,9 +73,11 @@ class Program
         services.AddTransient<IAuthorizedCommand>(serviceProvider => NotificationSubscriberCommand.Create(serviceProvider, "/subscribe"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => NotificationUnsubscriberCommand.Create(serviceProvider, "/unsubscribe"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => ShowSubscriptionsCommand.Create(serviceProvider, "/subscribe_get"));
+        services.AddTransient<IAuthorizedCommand>(serviceProvider => TestFirstCommand.Create(serviceProvider, "/команда"));
         #endregion
         #region обработчики полученных данных с ардуинки (процессоры)
         services.AddTransient<ISerialDataProcessor, TemperatureDataProcessor>();
+        services.AddTransient<ISerialDataProcessor, ErrorDataProcessor>();
         services.AddTransient<ISerialDataProcessor, DefaultDataProcessor>(); //обязательно оставить в самом низу списка процессоров, так как регулярка этого процессора подходит под все полученные данные. Те процессоры, что расположены ниже этого работать не будут, так как выполнится этот
         #endregion
         services.AddHostedService<BotService>();//не пытайся сделать интерфейс, там гемор

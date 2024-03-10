@@ -11,7 +11,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
 {
     public class StartSerialPortCommand : IAuthorizedCommand
     {
-        public string Name { get; set; } = "/упс";
+        public string Name { get; set; }
         private readonly ISerialPortService _serialPortService;
         private readonly ISerialDataHandler _dataHandler;
         private readonly ITelegramBotClient _botClient;

@@ -56,8 +56,8 @@ public class CommandHandler : ICommandHandler
             Log.Warning("Обработчик команд: Пользователь {ChatId} пытался выполнить команду без достаточных прав: {CommandName}", chatId, commandName);
             return false;
         }
-
         return true;
+
     }
 
     private async Task SendAuthorizationFailureMessage(ITelegramBotClient botClient, long chatId, string commandName)

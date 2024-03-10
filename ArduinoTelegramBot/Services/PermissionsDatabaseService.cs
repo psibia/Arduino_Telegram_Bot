@@ -15,7 +15,7 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
     {
         new AccessKey("adminKey", new List<string> {"/user", "/shedule"}, isActive: true, isMasterKey: true),
         new AccessKey("commandKey", new List<string> {"/admin", "/user", "/get_serial", "/start_serial", "/serial", "/temp", "/close_serial", "/open_serial"}, isActive: true, isMasterKey: false),
-        new AccessKey("userKey", new List<string> {"/user"}, isActive: true, isMasterKey: false)
+        new AccessKey("userKey", new List<string> {"/user", "/команда"}, isActive: true, isMasterKey: false)
     };
 
     public async Task<AccessKey> GetPermissionsAsync(string key)
@@ -139,9 +139,9 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
     }
 
     private readonly string _tasksFilePath = "scheduledTasks.json";
-    public async Task SaveScheduledTaskAsync(ScheduledTaskData taskData)
+    public async Task SaveScheduledTaskAsync(ScheduledLoadFromDBTaskInfo taskData)
     {
-        List<ScheduledTaskData> tasks = await LoadScheduledTasksAsync();
+        List<ScheduledLoadFromDBTaskInfo> tasks = await LoadScheduledTasksAsync();
         tasks.Add(taskData);
         var json = JsonConvert.SerializeObject(tasks, Formatting.Indented);
         await File.WriteAllTextAsync(_tasksFilePath, json);
@@ -150,7 +150,7 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
 
     public async Task DeleteScheduledTaskAsync(string taskId)
     {
-        List<ScheduledTaskData> tasks = await LoadScheduledTasksAsync();
+        List<ScheduledLoadFromDBTaskInfo> tasks = await LoadScheduledTasksAsync();
         var taskToRemove = tasks.FirstOrDefault(task => task.TaskId == taskId);
         if (taskToRemove != null)
         {
@@ -165,16 +165,16 @@ public class PermissionsDatabaseService : IPermissionsDatabaseService
         }
     }
 
-    public async Task<List<ScheduledTaskData>> LoadScheduledTasksAsync()
+    public async Task<List<ScheduledLoadFromDBTaskInfo>> LoadScheduledTasksAsync()
     {
         if (!File.Exists(_tasksFilePath))
         {
             Log.Warning("База данных: Файл запланированных задач '{FilePath}' не найден. Возвращается пустой список задач.", _tasksFilePath);
-            return new List<ScheduledTaskData>();
+            return new List<ScheduledLoadFromDBTaskInfo>();
         }
 
         var json = await File.ReadAllTextAsync(_tasksFilePath);
-        var tasks = JsonConvert.DeserializeObject<List<ScheduledTaskData>>(json) ?? new List<ScheduledTaskData>();
+        var tasks = JsonConvert.DeserializeObject<List<ScheduledLoadFromDBTaskInfo>>(json) ?? new List<ScheduledLoadFromDBTaskInfo>();
         Log.Information("База данных: Запланированные задачи успешно загружены из файла '{FilePath}'.", _tasksFilePath);
         return tasks;
     }

@@ -107,7 +107,7 @@ namespace ArduinoTelegramBot.Services
         public void ActivateDataReceiving(Action<string, long> onDataReceived)
         {
             _onDataReceived = onDataReceived;
-            StringBuilder buffer = new StringBuilder(); // Буфер для накопления данных
+            StringBuilder buffer = new StringBuilder(); //буфер для накопления данных
 
             _serialPort.DataReceived += (sender, e) =>
             {
@@ -139,12 +139,13 @@ namespace ArduinoTelegramBot.Services
                             if (_requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
                             {
                                 Log.Error("Сервис последовательного порта: Ошибка на устройстве, подключенном к {PortName}. Код ошибки: {ErrorCode}", _serialPort.PortName, content);
-                                _onDataReceived?.Invoke("Error: " + DescribeErrorCode(content), chatId);
+                                _onDataReceived?.Invoke($"ERR: {content} {DescribeErrorCode(content)}", chatId);
                                 _requestGuidToChatIdMap.Remove(identifier);
                             }
                         }
                         else if (type == "NOT")
                         {
+                            Log.Information("Сервис последовательного порта: Получено сообщение из {PortName}. Сообщение: {content}", _serialPort.PortName, content);
                             if (_subscriptions.ContainsKey(identifier))
                             {
                                 foreach (var subscribedChatId in _subscriptions[identifier])
@@ -251,7 +252,7 @@ namespace ArduinoTelegramBot.Services
         {
             return errorCode switch
             {
-                "001" => "Не удалось обработать переданные данные",
+                "001" => "Не удалось обработать тело запроса",
                 "002" => "Описание ошибки с кодом 002",
                 
                 _ => "Неизвестный код ошибки"

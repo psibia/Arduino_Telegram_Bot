@@ -8,7 +8,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
 {
     public class SendDataCommand : IAuthorizedCommand
     {
-        public string Name { get; set; } = "/упс";
+        public string Name { get; set; }
         private readonly ITelegramBotClient _botClient;
         private readonly ISerialPortService _serialPortService;
 
@@ -42,7 +42,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
             var result = await _serialPortService.SendDataAsync(dataToSend, chatId);
             if (result.Success)
             {
-                await botClient.SendTextMessageAsync(chatId, "Запрос отправлен."); //удалить, это для тестирования
+                //await botClient.SendTextMessageAsync(chatId, "Запрос отправлен."); //удалить, это для тестирования
             }
             else
             {
