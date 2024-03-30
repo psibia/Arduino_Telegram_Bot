@@ -18,6 +18,7 @@ using ArduinoTelegramBot.Repositories.Authorization;
 using ArduinoTelegramBot.Repositories.Authorization.Interfaces;
 using ArduinoTelegramBot.Dialogs.Interfaces;
 using ArduinoTelegramBot.Dialogs.Test;
+using ArduinoTelegramBot.Dialogs.System;
 
 namespace ArduinoTelegramBot;
 
@@ -93,9 +94,10 @@ class Program
 
         #region диалоги не требующие авторизации
         services.AddTransient<IDialog>(serviceProvider => DemonstrationDialog.Create(serviceProvider, "/dialog"));
+        services.AddTransient<IDialog>(serviceProvider => StartDialog.Create(serviceProvider, "/start"));
         #endregion
         #region диалоги, для выполнения которых нужна авторизация
-        
+
         #endregion
 
         #region обработчики полученных данных с ардуинки (процессоры)

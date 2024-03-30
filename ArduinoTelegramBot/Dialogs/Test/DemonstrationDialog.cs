@@ -77,6 +77,11 @@ public class DemonstrationDialog : IDialog
     }
 }
 
+
+
+
+
+
 public abstract class DialogStateBase : IDialogState
 {
     public abstract Task ProcessAsync(IDialog dialog, Message message, ITelegramBotClient botClient);
@@ -222,7 +227,7 @@ public class CompletionState : DialogStateBase
 
     public override IDialogState DetermineNextState(string response, IDialog dialog)
     {
-        return this; // Остаёмся в этом состоянии, так как диалог завершён.
+        return this;
     }
 }
 
