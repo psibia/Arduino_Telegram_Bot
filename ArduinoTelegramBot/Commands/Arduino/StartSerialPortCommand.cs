@@ -11,7 +11,7 @@ namespace ArduinoTelegramBot.Commands.Arduino
 {
     public class StartSerialPortCommand : IAuthorizedCommand
     {
-        public string Name { get; set; } = "/упс";
+        public string Name { get; set; }
         private readonly ISerialPortService _serialPortService;
         private readonly ISerialDataHandler _dataHandler;
         private readonly ITelegramBotClient _botClient;
@@ -39,7 +39,6 @@ namespace ArduinoTelegramBot.Commands.Arduino
 
         public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
         {
-            SerialPortOperationResult openPortResult = null;
             string[] args = message.Text.Split(' ');
             if (args.Length >= 2)
             {
@@ -49,32 +48,12 @@ namespace ArduinoTelegramBot.Commands.Arduino
                 int dataBits = args.Length > 4 ? int.Parse(args[4]) : 8;
                 StopBits stopBits = args.Length > 5 ? (StopBits)Enum.Parse(typeof(StopBits), args[5], true) : StopBits.One;
 
-                try
+                //попытка инициализации и открытия порта с заданными параметрами
+                var result = await _serialPortService.InitializeAndOpenAsync(portName, baudRate, parity, dataBits, stopBits);
+                await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
+                if (result.Success)
                 {
-                    if (_serialPortService.CurrentSerialPort().IsOpen && _serialPortService.CurrentSerialPort().PortName == portName &&
-                        _serialPortService.CurrentSerialPort().BaudRate == baudRate && _serialPortService.CurrentSerialPort().Parity == parity &&
-                        _serialPortService.CurrentSerialPort().DataBits == dataBits && _serialPortService.CurrentSerialPort().StopBits == stopBits)
-                    {
-                        await botClient.SendTextMessageAsync(message.Chat.Id, "SerialPort уже открыт с этими параметрами.");
-                    }
-                    else
-                    {
-                        if (_serialPortService.CurrentSerialPort().IsOpen)
-                        {
-                            await _serialPortService.ClosePortAsync();
-                        }
-                        _serialPortService.Initialize(portName, baudRate, parity, dataBits, stopBits);
-                        var result = await _serialPortService.TryOpenPortAsync();
-                        await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
-                        if (result.Success)
-                        {
-                            await _permissionsDatabase.SaveSerialPortConfigAsync(portName, baudRate, parity, dataBits, stopBits);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await botClient.SendTextMessageAsync(message.Chat.Id, $"Ошибка: {ex.Message}");
+                    await _permissionsDatabase.SaveSerialPortConfigAsync(portName, baudRate, parity, dataBits, stopBits);
                 }
             }
             else
@@ -82,21 +61,9 @@ namespace ArduinoTelegramBot.Commands.Arduino
                 try
                 {
                     var config = await _permissionsDatabase.LoadSerialPortConfigAsync();
-                    if (config.PortName != null && _serialPortService.CurrentSerialPort().IsOpen &&
-                        _serialPortService.CurrentSerialPort().PortName == config.PortName)
-                    {
-                        await botClient.SendTextMessageAsync(message.Chat.Id, "SerialPort уже открыт с этими параметрами.");
-                    }
-                    else
-                    {
-                        if (_serialPortService.CurrentSerialPort().IsOpen)
-                        {
-                            await _serialPortService.ClosePortAsync();
-                        }
-                        _serialPortService.Initialize(config.PortName, config.BaudRate, config.Parity, config.DataBits, config.StopBits);
-                        var result = await _serialPortService.TryOpenPortAsync();
-                        await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
-                    }
+                    //попытка инициализации и открытия порта с сохранёнными параметрами
+                    var result = await _serialPortService.InitializeAndOpenAsync(config.PortName, config.BaudRate, config.Parity, config.DataBits, config.StopBits);
+                    await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);
                 }
                 catch (Exception ex)
                 {
@@ -106,12 +73,11 @@ namespace ArduinoTelegramBot.Commands.Arduino
 
             if (_serialPortService.CurrentSerialPort().IsOpen)
             {
-                //для приема данных с ардуины
+                // Активация приёма данных
                 _serialPortService.ActivateDataReceiving(async (data, chatId) =>
                 {
-                    await _dataHandler.HandleReceivedDataAsync(data, message.Chat.Id);
+                    await _dataHandler.HandleReceivedDataAsync(data, chatId);
                 });
-                //await _botClient.SendTextMessageAsync(message.Chat.Id, "Начат прием данных из SerialPort. Отправьте данные на устройство.");
             }
         }
     }

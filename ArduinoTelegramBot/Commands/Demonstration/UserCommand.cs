@@ -6,7 +6,7 @@ namespace ArduinoTelegramBot.Commands.Demonstration;
 
 public class UserCommand : IAuthorizedCommand
 {
-    public string Name { get; set; } = "/упс";
+    public string Name { get; set; }
 
     public async Task ExecuteAsync(ITelegramBotClient botClient, Message message)
     {

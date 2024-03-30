@@ -20,11 +20,11 @@ public class BotService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Log.Information("Сервис телеграм-бота: Запуск приема сообщений...");
+        Log.Information("Сервис телеграм-бота: Запуск приема сообщений");
 
         _botClient.StartReceiving(HandleUpdateAsync, HandleErrorAsync, new ReceiverOptions { AllowedUpdates = Array.Empty<UpdateType>() }, stoppingToken);
 
-        stoppingToken.Register(() => Log.Information("Сервис телеграм-бота: Остановка приема сообщений..."));
+        stoppingToken.Register(() => Log.Information("Сервис телеграм-бота: Остановка приема сообщений"));
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Telegram.Bot.Types.Update update, CancellationToken cancellationToken)

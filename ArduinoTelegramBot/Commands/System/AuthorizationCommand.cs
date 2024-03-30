@@ -32,7 +32,7 @@ public class AuthorizationCommand : ICommand
         if (parts.Length == 2)
         {
             var key = parts[1];
-            var result = await authorizationService.ProcessAuthorizationAttempt(key, message.Chat.Id);
+            var result = await authorizationService.AttemptAuthorizationWithKey(key, message.Chat.Id);
 
             //Отправляем результат авторизации пользователю
             await botClient.SendTextMessageAsync(message.Chat.Id, result.Message);

@@ -2,7 +2,10 @@
 using ArduinoTelegramBot.Models;
 using ArduinoTelegramBot.Services.Interfaces;
 using Serilog;
+using System.Collections.ObjectModel;
 using System.IO.Ports;
+using System.Text;
+using Telegram.Bot.Types;
 
 namespace ArduinoTelegramBot.Services
 {
@@ -11,9 +14,18 @@ namespace ArduinoTelegramBot.Services
         private SerialPort _serialPort = new SerialPort();
         private Action<string, long> _onDataReceived;
         private ISerialDataHandler _dataHandler;
+        private readonly Dictionary<string, long> _requestGuidToChatIdMap = new();
+        private readonly Dictionary<string, HashSet<long>> _subscriptions = new Dictionary<string, HashSet<long>>();
+        private IPermissionsDatabaseService _permissionsDatabaseService;
 
+        public SerialPortService(IPermissionsDatabaseService permissionsDatabaseService)
+        {
+            _permissionsDatabaseService = permissionsDatabaseService;
+            _subscriptions = _permissionsDatabaseService.LoadSubscriptionsAsync().Result;
+        }
+        public SerialPort CurrentSerialPort() => _serialPort;
 
-        public void Initialize(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits)
+        public async Task<SerialPortOperationResult> InitializeAndOpenAsync(string portName, int baudRate, Parity parity, int dataBits, StopBits stopBits)
         {
             if (_serialPort.IsOpen)
             {
@@ -22,7 +34,7 @@ namespace ArduinoTelegramBot.Services
                     _serialPort.StopBits == stopBits)
                 {
                     Log.Information("Сервис последовательного порта: SerialPort уже открыт с этими параметрами.");
-                    throw new InvalidOperationException("SerialPort уже открыт с этими параметрами.");
+                    return SerialPortOperationResult.Error("SerialPort уже открыт с этими параметрами.");
                 }
                 else
                 {
@@ -35,20 +47,124 @@ namespace ArduinoTelegramBot.Services
             _serialPort.Parity = parity;
             _serialPort.DataBits = dataBits;
             _serialPort.StopBits = stopBits;
-            Log.Information($"Сервис последовательного порта: SerialPort инициализирован: {portName}, {baudRate}, {parity.ToString()}, {dataBits}, {stopBits.ToString()}");
+            Log.Information("Сервис последовательного порта: SerialPort инициализирован: {portName}, {baudRate}, {parity}, {dataBits}, {stopBits}", portName, baudRate, parity, dataBits, stopBits);
+            return await TryOpenPortAsync();
+        }
+
+        public async Task<SerialPortOperationResult> Subscribe(long chatId, string command)
+        {
+            if (!_subscriptions.ContainsKey(command))
+            {
+                _subscriptions[command] = new HashSet<long>();
+            }
+
+            bool added = _subscriptions[command].Add(chatId);
+            if (added)
+            {
+                await _permissionsDatabaseService.SaveSubscriptionsAsync(_subscriptions);
+                Log.Information("Сервис последовательного порта: ChatId {chatId} подписался на уведомления {command}.", chatId, command);
+                return SerialPortOperationResult.Ok($"Вы успешно подписались на уведомления с идентификатором {command}.");
+            }
+            else
+            {
+                return SerialPortOperationResult.Error($"Вы уже подписаны на уведомления с идентификатором {command}.");
+            }
+        }
+
+        public async Task<SerialPortOperationResult> Unsubscribe(long chatId, string command)
+        {
+            if (_subscriptions.ContainsKey(command) && _subscriptions[command].Remove(chatId))
+            {
+                if (_subscriptions[command].Count == 0)
+                {
+                    _subscriptions.Remove(command);
+                }
+                await _permissionsDatabaseService.SaveSubscriptionsAsync(_subscriptions);
+                Log.Information("Сервис последовательного порта: ChatId {chatId} отписался от уведомлений {command}", chatId, command);
+                return SerialPortOperationResult.Ok($"Вы успешно отписались от уведомлений с идентификатором {command}.");
+            }
+            else
+            {
+                return SerialPortOperationResult.Error($"Вы не подписаны на уведомления с идентификатором {command}.");
+            }
+        }
+
+        public async Task<List<string>> GetUserSubscriptionsAsync(long chatId)
+        {
+            List<string> userSubscriptions = new List<string>();
+
+            foreach (var subscription in _subscriptions)
+            {
+                if (subscription.Value.Contains(chatId))
+                {
+                    userSubscriptions.Add(subscription.Key);
+                }
+            }
+
+            return userSubscriptions;
         }
 
         public void ActivateDataReceiving(Action<string, long> onDataReceived)
         {
             _onDataReceived = onDataReceived;
+            StringBuilder buffer = new StringBuilder(); //буфер для накопления данных
 
             _serialPort.DataReceived += (sender, e) =>
             {
                 string data = _serialPort.ReadExisting();
-                _onDataReceived?.Invoke(data, 0); // 0 - плейсхолдер для, будет задан в команде
-            };
+                buffer.Append(data);
 
-            Log.Information("Сервис последовательного порта: SerialPort настроен для получения данных.");
+                string bufferContent = buffer.ToString();
+                int newLineIndex = bufferContent.IndexOf('\n');
+                while (newLineIndex != -1)
+                {
+                    string message = bufferContent.Substring(0, newLineIndex).Trim();
+                    string[] parts = message.Split(new[] { ':' }, 3);
+                    if (parts.Length >= 3)
+                    {
+                        string type = parts[0];
+                        string identifier = parts[1];
+                        string content = parts[2];
+
+                        if (type == "RES")
+                        {
+                            if (_requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
+                            {
+                                _onDataReceived?.Invoke(content, chatId);
+                                _requestGuidToChatIdMap.Remove(identifier);
+                            }
+                        }
+                        else if (type == "ERR")
+                        {
+                            if (_requestGuidToChatIdMap.TryGetValue(identifier, out long chatId))
+                            {
+                                Log.Error("Сервис последовательного порта: Ошибка на устройстве, подключенном к {PortName}. Код ошибки: {ErrorCode}", _serialPort.PortName, content);
+                                _onDataReceived?.Invoke($"ERR: {content} {DescribeErrorCode(content)}", chatId);
+                                _requestGuidToChatIdMap.Remove(identifier);
+                            }
+                        }
+                        else if (type == "NOT")
+                        {
+                            Log.Information("Сервис последовательного порта: Получено сообщение из {PortName}. Сообщение: {content}", _serialPort.PortName, content);
+                            if (_subscriptions.ContainsKey(identifier))
+                            {
+                                foreach (var subscribedChatId in _subscriptions[identifier])
+                                {
+                                    _onDataReceived?.Invoke(content, subscribedChatId);
+                                }
+                            }
+                        }
+
+                        buffer.Remove(0, newLineIndex + 1);
+                        bufferContent = buffer.ToString();
+                        newLineIndex = bufferContent.IndexOf('\n');
+                    }
+                    else
+                    {
+                        break; //если строка не содержит достаточно частей, прерываем обработку
+                    }
+                }
+            };
         }
 
         public async Task<SerialPortOperationResult> ListAvailablePortsAsync()
@@ -66,31 +182,6 @@ namespace ArduinoTelegramBot.Services
             }
         }
 
-        public async Task<SerialPortOperationResult> TryOpenPortAsync()
-        {
-            try
-            {
-                if (!_serialPort.IsOpen)
-                {
-                    _serialPort.Open();
-                    Log.Information($"Сервис последовательного порта: SerialPort успешно открыт: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
-                    return SerialPortOperationResult.Ok($"Порт успешно открыт с параметрами: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
-                }
-                else
-                {
-                    return SerialPortOperationResult.Error($"Порт {_serialPort.PortName} уже открыт.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Сервис последовательного порта: Ошибка при открытии SerialPort: {ex}", ex.Message);
-                return SerialPortOperationResult.Error($"Ошибка при открытии порта: {ex.Message}");
-            }
-        }
-
-
-        public SerialPort CurrentSerialPort() => _serialPort;
-
         public async Task<SerialPortOperationResult> ClosePortAsync()
         {
             if (_serialPort.IsOpen)
@@ -107,44 +198,65 @@ namespace ArduinoTelegramBot.Services
         }
 
 
-        public async Task<SerialPortOperationResult> SendDataAsync(string data)
+        public async Task<SerialPortOperationResult> SendDataAsync(string data, long chatId)
         {
-            if (_serialPort.IsOpen)
+            try
             {
-                _serialPort.Write(data);
-                Log.Information("Сервис последовательного порта: Данные отправлены в SerialPort {sp}: {data}", _serialPort.PortName, data);
-                return SerialPortOperationResult.Ok("Данные отправлены.");
+                string guid = Guid.NewGuid().ToString();
+                _requestGuidToChatIdMap[guid] = chatId;
+
+                //форматирование данных с префиксом "REQ" для всех реквестов в сириал порт
+                string dataWithGuidAndType = $"REQ:{guid}:{data}";
+                if (_serialPort.IsOpen)
+                {
+                    _serialPort.Write(dataWithGuidAndType);
+                    Log.Information("Сервис последовательного порта: Данные отправлены: {dataWithGuidAndType}", dataWithGuidAndType);
+                    return SerialPortOperationResult.Ok("Данные отправлены.");
+                }
+                else
+                {
+                    return SerialPortOperationResult.Error("SerialPort не открыт.");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Log.Warning("Сервис последовательного порта: Попытка отправить данные в SerialPort завершилась неудачей - порт не открыт.");
-                return SerialPortOperationResult.Error($"Порт не открыт.");
+                Log.Error(ex, "Сервис последовательного порта: Ошибка при отправке данных: {Message}", ex.Message);
+                return SerialPortOperationResult.Error($"Ошибка при отправке данных: {ex.Message}");
             }
         }
 
-        public async Task<SerialPortOperationResult> SendBinaryDataAsync(byte[] data)
+
+        private async Task<SerialPortOperationResult> TryOpenPortAsync()
         {
             try
             {
                 if (!_serialPort.IsOpen)
                 {
-                    return SerialPortOperationResult.Error("Порт не открыт. Отправка данных невозможна.");
+                    _serialPort.Open();
+                    Log.Information($"Сервис последовательного порта: SerialPort успешно открыт: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
+                    return SerialPortOperationResult.Ok($"Порт успешно открыт с параметрами: {_serialPort.PortName}, {_serialPort.BaudRate}, {_serialPort.Parity}, {_serialPort.DataBits}, {_serialPort.StopBits}");
                 }
-
-                _serialPort.Write(data, 0, data.Length);
-                Log.Information("Сервис последовательного порта: Бинарные данные успешно отправлены: {data}", BitConverter.ToString(data));
-                return SerialPortOperationResult.Ok($"Бинарные данные успешно отправлены: {BitConverter.ToString(data)}.");
-            }
-            catch (TimeoutException ex)
-            {
-                Log.Error(ex, "Сервис последовательного порта: Превышено время ожидания для отправки данных в {pn}", _serialPort.PortName);
-                return SerialPortOperationResult.Error("Превышено время ожидания для отправки данных.");
+                else
+                {
+                    return SerialPortOperationResult.Error($"Порт {_serialPort.PortName} уже открыт.");
+                }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Сервис последовательного порта: Произошла ошибка при отправке данных в {pn}: {msg}", _serialPort.PortName, ex.Message);
-                return SerialPortOperationResult.Error($"Произошла ошибка при отправке данных: {ex.Message}.");
+                Log.Error(ex, $"Сервис последовательного порта: Ошибка при открытии SerialPort: {ex.Message}");
+                return SerialPortOperationResult.Error($"Ошибка при открытии порта: {ex.Message}");
             }
+        }
+
+        private string DescribeErrorCode(string errorCode)
+        {
+            return errorCode switch
+            {
+                "001" => "Не удалось обработать тело запроса",
+                "002" => "Описание ошибки с кодом 002",
+                
+                _ => "Неизвестный код ошибки"
+            };
         }
     }
 }
