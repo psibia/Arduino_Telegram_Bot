@@ -88,4 +88,9 @@ public class CommandHandler : ICommandHandler
             Log.Warning("Обработчик команд: Попытка выполнения неизвестной команды, команда по умолчанию не установлена, chatId: {ChatId}", message.Chat.Id);
         }
     }
+
+    public Task HandleCallbackQueryAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery)
+    {
+        throw new NotImplementedException();
+    }
 }

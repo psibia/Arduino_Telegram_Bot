@@ -6,5 +6,6 @@ namespace ArduinoTelegramBot.Handlers.Interfaces
     public interface ICommandHandler
     {
         Task HandleCommandAsync(ITelegramBotClient botClient, Message message);
+        Task HandleCallbackQueryAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery);
     }
 }

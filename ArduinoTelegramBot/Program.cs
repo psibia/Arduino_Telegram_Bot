@@ -16,6 +16,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using ArduinoTelegramBot.Repositories.Authorization;
 using ArduinoTelegramBot.Repositories.Authorization.Interfaces;
+using ArduinoTelegramBot.Dialogs.Interfaces;
+using ArduinoTelegramBot.Dialogs.Test;
 
 namespace ArduinoTelegramBot;
 
@@ -56,15 +58,16 @@ class Program
         var connectionString = "server=localhost;port=3306;user=root;password=root;database=telegram_bot_management";
         services.AddDbContext<AccessControlDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-        services.AddSingleton<IAccessControlService, AccessControlService>();
+        services.AddSingleton<IAccessControlService, MySQLAccessControlService>();
         services.AddSingleton<IUserAuthorizationService, UserAuthorizationService>();
         
-        services.AddSingleton<ICommandHandler, CommandHandler>();
+        services.AddSingleton<ICommandHandler, UnifiedCommandHandler>();
         services.AddSingleton<IPermissionsDatabaseService, PermissionsDatabaseService>();
         services.AddSingleton<ISerialPortService, SerialPortService>();
         services.AddSingleton<ISerialDataHandler, SerialDataHandler>();
         services.AddSingleton<ISchedulerService, SchedulerService>();
         services.AddTransient<ICommandFactory, CommandFactory>();
+
 
         #region команды не требующие авторизации
         services.AddTransient<ICommand>(serviceProvider => DefaultCommand.Create("/default"));
@@ -86,6 +89,15 @@ class Program
         services.AddTransient<IAuthorizedCommand>(serviceProvider => ShowSubscriptionsCommand.Create(serviceProvider, "/subscribe_get"));
         services.AddTransient<IAuthorizedCommand>(serviceProvider => TestFirstCommand.Create(serviceProvider, "/команда"));
         #endregion
+
+
+        #region диалоги не требующие авторизации
+        services.AddTransient<IDialog>(serviceProvider => DemonstrationDialog.Create(serviceProvider, "/dialog"));
+        #endregion
+        #region диалоги, для выполнения которых нужна авторизация
+        
+        #endregion
+
         #region обработчики полученных данных с ардуинки (процессоры)
         services.AddTransient<ISerialDataProcessor, TemperatureDataProcessor>();
         services.AddTransient<ISerialDataProcessor, ErrorDataProcessor>();

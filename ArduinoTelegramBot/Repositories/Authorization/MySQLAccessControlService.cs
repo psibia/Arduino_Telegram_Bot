@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ArduinoTelegramBot.Repositories.Authorization
 {
-    public class AccessControlService : IAccessControlService
+    public class MySQLAccessControlService : IAccessControlService
     {
         private readonly AccessControlDbContext _context;
 
-        public AccessControlService(AccessControlDbContext context)
+        public MySQLAccessControlService(AccessControlDbContext context)
         {
             _context = context;
         }
