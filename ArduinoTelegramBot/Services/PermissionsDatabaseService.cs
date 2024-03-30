@@ -11,56 +11,7 @@ namespace ArduinoTelegramBot.Services;
 
 public class PermissionsDatabaseService : IPermissionsDatabaseService
 {
-    private static readonly List<AccessKey> _accessKeys = new()
-    {
-        new AccessKey("adminKey", new List<string> {"/user", "/shedule"}, isActive: true, isMasterKey: true),
-        new AccessKey("commandKey", new List<string> {"/admin", "/user", "/get_serial", "/start_serial", "/serial", "/temp", "/close_serial", "/open_serial"}, isActive: true, isMasterKey: false),
-        new AccessKey("userKey", new List<string> {"/user", "/команда"}, isActive: true, isMasterKey: false)
-    };
-
-    public async Task<AccessKey> GetPermissionsAsync(string key)
-    {
-        await Task.Delay(42); // Имитация асинхронной операции
-        var accessKey = _accessKeys.FirstOrDefault(k => k.Key == key && k.IsActive);
-
-        if (accessKey != null)
-        {
-            Log.Information("База данных: Доступ к ключу '{Key}' успешно получен. Активен: {IsActive}, Мастер-ключ: {IsMasterKey}.", key, accessKey.IsActive, accessKey.IsMasterKey);
-            return accessKey;
-        }
-        else
-        {
-            Log.Warning("База данных: Ключ '{Key}' не найден или не активен.", key);
-            throw new KeyNotFoundException($"Ключ '{key}' не найден в базе данных или не активен.");
-        }
-    }
-
-    private static readonly string _authDataFilePath = "authData.json";
-    public async Task<ConcurrentDictionary<long, string>> LoadUserKeysAsync()
-    {
-        if (File.Exists(_authDataFilePath))
-        {
-            var json = await File.ReadAllTextAsync(_authDataFilePath);
-            var userKeys = JsonConvert.DeserializeObject<ConcurrentDictionary<long, string>>(json) ?? new ConcurrentDictionary<long, string>();
-
-            Log.Information("База данных: Ключи пользователя успешно загружены из файла '{FilePath}'.", _authDataFilePath);
-            Log.Debug("База данных: Загруженные ключи пользователей:\n{UserKeys}", json);
-            return userKeys;
-        }
-        else
-        {
-            Log.Warning("База данных: Файл авторизационных данных '{FilePath}' не найден, начинаем с пустого набора ключей пользователей.", _authDataFilePath);
-            return new ConcurrentDictionary<long, string>();
-        }
-    }
-
-    public async Task SaveUserKeysAsync(ConcurrentDictionary<long, string> userKeys)
-    {
-        var json = JsonConvert.SerializeObject(userKeys, Formatting.Indented);
-        await File.WriteAllTextAsync(_authDataFilePath, json);
-        Log.Information("База данных: Ключи пользователей успешно сохранены в файл '{FilePath}'.", _authDataFilePath);
-        Log.Debug("База данных: Сохраненные ключи пользователей: {UserKeys}", json);
-    }
+    
 
     private readonly string _serialPortConfigFile = "SerialPortConfig.json";
     public async Task<(string PortName, int BaudRate, Parity Parity, int DataBits, StopBits StopBits)> LoadSerialPortConfigAsync()
