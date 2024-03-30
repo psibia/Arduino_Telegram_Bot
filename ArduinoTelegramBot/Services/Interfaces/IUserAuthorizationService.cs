@@ -1,4 +1,6 @@
-﻿using ArduinoTelegramBot.Models;
+﻿
+
+using ArduinoTelegramBot.Models.Authorization;
 
 namespace ArduinoTelegramBot.Services.Interfaces;
 

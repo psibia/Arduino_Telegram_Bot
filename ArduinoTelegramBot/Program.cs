@@ -12,6 +12,10 @@ using ArduinoTelegramBot.Commands.Arduino;
 using ArduinoTelegramBot.Handlers.Interfaces;
 using ArduinoTelegramBot.Processors.Arduino.Interfaces;
 using ArduinoTelegramBot.Processors.Arduino;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using ArduinoTelegramBot.Repositories.Authorization;
+using ArduinoTelegramBot.Repositories.Authorization.Interfaces;
 
 namespace ArduinoTelegramBot;
 
@@ -45,7 +49,14 @@ class Program
     {
         Log.Debug("Program: Настройка сервисов");
 
-        services.AddSingleton<ITelegramBotClient>(provider => new TelegramBotClient("7115970409:AAFBIPevz5fhaHD-BNskOJJZoMUWbckV5SQ"));
+        services.AddMemoryCache();
+
+        services.AddSingleton<ITelegramBotClient>(provider => new TelegramBotClient("6595562772:AAHwvDnXUhu7WDf8CC6q-g791gOrfNVBFnA"));
+
+        var connectionString = "server=localhost;port=3306;user=root;password=root;database=telegram_bot_management";
+        services.AddDbContext<AccessControlDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+        services.AddSingleton<IAccessControlService, AccessControlService>();
         services.AddSingleton<IUserAuthorizationService, UserAuthorizationService>();
         
         services.AddSingleton<ICommandHandler, CommandHandler>();
